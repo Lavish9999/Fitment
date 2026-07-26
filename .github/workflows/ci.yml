@@ -34,6 +34,17 @@ jobs:
           node-version: 22.13
       - run: pnpm install --frozen-lockfile=false
       - name: Typecheck mobile app
-        run: pnpm --filter @fitment/mobile typecheck
+        id: mobile_typecheck
+        continue-on-error: true
+        run: pnpm --filter @fitment/mobile typecheck > mobile-typecheck.log 2>&1
+      - name: Preserve mobile typecheck log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mobile-typecheck-log
+          path: mobile-typecheck.log
+      - name: Report mobile typecheck failure
+        if: steps.mobile_typecheck.outcome == 'failure'
+        run: cat mobile-typecheck.log && exit 1
       - name: Export iOS JavaScript bundle
         run: pnpm --filter @fitment/mobile export:ios
