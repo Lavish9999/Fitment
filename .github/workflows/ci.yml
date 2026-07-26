@@ -33,6 +33,8 @@ jobs:
         with:
           node-version: 22.13
       - run: pnpm install --frozen-lockfile=false
+      - name: Check Expo package compatibility
+        run: pnpm --filter @fitment/mobile doctor
       - name: Typecheck mobile app
         id: mobile_typecheck
         continue-on-error: true
