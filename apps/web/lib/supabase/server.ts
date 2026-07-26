@@ -20,7 +20,13 @@ export async function createSupabaseServerClient() {
         }>,
       ) => {
         try {
-          items.forEach(({ name, value, options }) => cookieStore.set(name, value, options));
+          items.forEach(({ name, value, options }) => {
+            if (options) {
+              cookieStore.set(name, value, options);
+            } else {
+              cookieStore.set(name, value);
+            }
+          });
         } catch {
           // Server Components cannot always write cookies. Middleware will refresh sessions later.
         }
