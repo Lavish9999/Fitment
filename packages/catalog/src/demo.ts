@@ -56,7 +56,7 @@ export const demoHost: CatalogVariant = {
   dataCompleteness: "PARTIAL",
 };
 
-export const demoAccessories: CatalogVariant[] = [
+export const demoAccessories: [CatalogVariant, ...CatalogVariant[]] = [
   {
     id: "optic-rmr-demo",
     manufacturer: "Demo Optics Co.",
