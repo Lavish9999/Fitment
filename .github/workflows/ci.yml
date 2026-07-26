@@ -34,7 +34,18 @@ jobs:
           node-version: 22.13
       - run: pnpm install --frozen-lockfile=false
       - name: Check Expo package compatibility
-        run: pnpm --filter @fitment/mobile doctor
+        id: expo_doctor
+        continue-on-error: true
+        run: pnpm --filter @fitment/mobile doctor > expo-doctor.log 2>&1
+      - name: Preserve Expo Doctor log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: expo-doctor-log
+          path: expo-doctor.log
+      - name: Report Expo Doctor failure
+        if: steps.expo_doctor.outcome == 'failure'
+        run: cat expo-doctor.log && exit 1
       - name: Typecheck mobile app
         id: mobile_typecheck
         continue-on-error: true
