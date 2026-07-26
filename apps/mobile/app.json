@@ -1,0 +1,19 @@
+{
+  "expo": {
+    "name": "FITMENT",
+    "slug": "fitment",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "scheme": "fitment",
+    "userInterfaceStyle": "light",
+    "newArchEnabled": true,
+    "plugins": ["expo-router"],
+    "ios": {
+      "supportsTablet": false,
+      "bundleIdentifier": "com.lavish9999.fitment"
+    },
+    "experiments": {
+      "typedRoutes": true
+    }
+  }
+}
