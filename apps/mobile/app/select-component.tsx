@@ -3,8 +3,6 @@ import { useRouter } from "expo-router";
 import { useMemo, useState } from "react";
 import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { demoAccessories } from "@fitment/catalog";
-
 import { ModalScreen } from "../src/components/ui";
 import { categoryLabel, money, statusPresentation } from "../src/presentation";
 import { useFitment } from "../src/state/FitmentProvider";
@@ -12,19 +10,19 @@ import { colors, fontFamily, radius, spacing } from "../src/theme";
 
 export default function SelectComponentScreen() {
   const router = useRouter();
-  const { selectedAccessory, selectAccessory, evaluations } = useFitment();
+  const { accessories, selectedAccessory, selectAccessory, evaluations } = useFitment();
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
 
   const categories = useMemo(
-    () => [...new Set(demoAccessories.map((product) => product.category))],
-    [],
+    () => [...new Set(accessories.map((product) => product.category))],
+    [accessories],
   );
 
-  const results = demoAccessories.filter((product) => {
+  const results = accessories.filter((product) => {
     if (category && product.category !== category) return false;
     if (!query.trim()) return true;
-    const haystack = `${product.manufacturer} ${product.family} ${product.exactModel}`.toLowerCase();
+    const haystack = `${product.manufacturer} ${product.family} ${product.exactModel} ${product.sku ?? ""}`.toLowerCase();
     return haystack.includes(query.trim().toLowerCase());
   });
 
@@ -42,7 +40,7 @@ export default function SelectComponentScreen() {
             style={styles.searchInput}
             value={query}
             onChangeText={setQuery}
-            placeholder="Search brand or model"
+            placeholder="Search brand, model, or SKU"
             placeholderTextColor={colors.inkFaint}
             autoCorrect={false}
             clearButtonMode="while-editing"
@@ -89,9 +87,7 @@ export default function SelectComponentScreen() {
                   <Text style={styles.meta}>
                     {categoryLabel(product.category)} · {money(product.knownPriceCents)}
                   </Text>
-                  {status ? (
-                    <Text style={[styles.status, { color: status.foreground }]}>{status.label}</Text>
-                  ) : null}
+                  {status ? <Text style={[styles.status, { color: status.foreground }]}>{status.label}</Text> : null}
                 </View>
                 <View style={selected ? styles.checkSelected : styles.check}>
                   {selected ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
@@ -110,11 +106,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [
-        styles.chip,
-        active ? styles.chipActive : null,
-        pressed ? styles.pressed : null,
-      ]}
+      style={({ pressed }) => [styles.chip, active ? styles.chipActive : null, pressed ? styles.pressed : null]}
     >
       <Text style={[styles.chipText, active ? styles.chipTextActive : null]}>{label}</Text>
     </Pressable>
@@ -122,11 +114,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 }
 
 const styles = StyleSheet.create({
-  searchWrap: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.sm,
-    gap: spacing.xs,
-  },
+  searchWrap: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.xs },
   searchField: {
     minHeight: 40,
     flexDirection: "row",
@@ -151,13 +139,7 @@ const styles = StyleSheet.create({
   chipText: { color: colors.inkSoft, fontFamily, fontSize: 13, fontWeight: "500" },
   chipTextActive: { color: colors.white },
   list: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.xs },
-  noResults: {
-    color: colors.inkSoft,
-    fontFamily,
-    fontSize: 14,
-    textAlign: "center",
-    paddingVertical: spacing.xl,
-  },
+  noResults: { color: colors.inkSoft, fontFamily, fontSize: 14, textAlign: "center", paddingVertical: spacing.xl },
   row: {
     flexDirection: "row",
     alignItems: "center",
@@ -183,13 +165,7 @@ const styles = StyleSheet.create({
   model: { color: colors.ink, fontFamily, fontSize: 15, lineHeight: 20, fontWeight: "600", marginTop: 1 },
   meta: { color: colors.inkSoft, fontFamily, fontSize: 12, marginTop: 3 },
   status: { fontFamily, fontSize: 12, fontWeight: "600", marginTop: 3 },
-  check: {
-    width: 22,
-    height: 22,
-    borderRadius: 11,
-    borderWidth: 1.5,
-    borderColor: colors.line,
-  },
+  check: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: colors.line },
   checkSelected: {
     width: 22,
     height: 22,
