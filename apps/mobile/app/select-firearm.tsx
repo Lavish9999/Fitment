@@ -1,125 +1,181 @@
 import { Ionicons } from "@expo/vector-icons";
-import { StyleSheet, Text, View } from "react-native";
+import { useRouter } from "expo-router";
+import { useMemo, useState } from "react";
+import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
-import { demoHost } from "@fitment/catalog";
-
-import { Card, MetricRow, ModalScreen } from "../src/components/ui";
+import { ModalScreen } from "../src/components/ui";
 import { categoryLabel, interfaceLabel, money } from "../src/presentation";
+import { useFitment } from "../src/state/FitmentProvider";
 import { colors, fontFamily, radius, spacing } from "../src/theme";
 
 export default function SelectFirearmScreen() {
+  const router = useRouter();
+  const { firearms, selectedHost, selectHost } = useFitment();
+  const [query, setQuery] = useState("");
+  const [manufacturer, setManufacturer] = useState<string | null>(null);
+
+  const manufacturers = useMemo(
+    () => [...new Set(firearms.map((firearm) => firearm.manufacturer))],
+    [firearms],
+  );
+
+  const results = firearms.filter((firearm) => {
+    if (manufacturer && firearm.manufacturer !== manufacturer) return false;
+    if (!query.trim()) return true;
+    const haystack = `${firearm.manufacturer} ${firearm.family} ${firearm.exactModel} ${firearm.sku ?? ""}`.toLowerCase();
+    return haystack.includes(query.trim().toLowerCase());
+  });
+
+  function choose(id: string) {
+    selectHost(id);
+    router.back();
+  }
+
   return (
-    <ModalScreen title="Firearm">
-      <Text style={styles.helper}>
-        Compatibility is checked against the exact variant, not a broad model name.
-      </Text>
-
-      <Card style={styles.selectedCard}>
-        <View style={styles.selectedTop}>
-          <View style={styles.copy}>
-            <Text style={styles.maker}>{demoHost.manufacturer}</Text>
-            <Text style={styles.model}>{demoHost.exactModel}</Text>
-          </View>
-          <View style={styles.check}>
-            <Ionicons name="checkmark" size={15} color={colors.white} />
-          </View>
-        </View>
-
-        <View style={styles.metrics}>
-          <MetricRow label="Family" value={demoHost.family} />
-          <MetricRow label="Category" value={categoryLabel(demoHost.category)} />
-          <MetricRow label="SKU" value={demoHost.sku ?? "Not recorded"} />
-          <MetricRow label="Known price" value={money(demoHost.knownPriceCents)} />
-          <MetricRow
-            label="Known weight"
-            value={demoHost.knownWeightGrams === undefined ? "Unknown" : `${demoHost.knownWeightGrams} g`}
-            last
+    <ModalScreen title="Choose exact firearm" scroll={false}>
+      <View style={styles.searchWrap}>
+        <Text style={styles.helper}>
+          Compatibility is recalculated for the exact variant you select. Changing firearms clears the current unsaved build.
+        </Text>
+        <View style={styles.searchField}>
+          <Ionicons name="search" size={16} color={colors.inkFaint} />
+          <TextInput
+            style={styles.searchInput}
+            value={query}
+            onChangeText={setQuery}
+            placeholder="Search manufacturer or model"
+            placeholderTextColor={colors.inkFaint}
+            autoCorrect={false}
+            clearButtonMode="while-editing"
           />
         </View>
-      </Card>
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.chips}>
+          <Chip label="All" active={manufacturer === null} onPress={() => setManufacturer(null)} />
+          {manufacturers.map((item) => (
+            <Chip
+              key={item}
+              label={item}
+              active={manufacturer === item}
+              onPress={() => setManufacturer(manufacturer === item ? null : item)}
+            />
+          ))}
+        </ScrollView>
+      </View>
 
-      <Text style={styles.sectionLabel}>Mounting interfaces</Text>
-      <Card style={styles.interfaceCard}>
-        {demoHost.provides.map((item, index) => (
-          <View
-            key={item.interfaceId}
-            style={[styles.interfaceRow, index === demoHost.provides.length - 1 ? styles.interfaceRowLast : null]}
-          >
-            <View style={styles.interfaceIcon}>
-              <Ionicons name="link-outline" size={16} color={colors.inkSoft} />
-            </View>
-            <View style={styles.copy}>
-              <Text style={styles.interfaceName}>{interfaceLabel(item.interfaceId)}</Text>
-              <Text style={styles.interfaceMeta}>
-                {item.location} · {item.verificationStatus === "DEMO_UNVERIFIED" ? "demo record" : "verified"}
-              </Text>
-            </View>
-          </View>
-        ))}
-      </Card>
-
-      <Text style={styles.footnote}>
-        This is the only firearm in the demo catalog. Variant search by manufacturer, generation,
-        caliber, and optic cut arrives with the full catalog.
-      </Text>
+      <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
+        {results.length === 0 ? (
+          <Text style={styles.noResults}>No exact firearm variants match this search.</Text>
+        ) : (
+          results.map((firearm) => {
+            const selected = firearm.id === selectedHost.id;
+            return (
+              <Pressable
+                key={firearm.id}
+                accessibilityRole="button"
+                onPress={() => choose(firearm.id)}
+                style={({ pressed }) => [
+                  styles.row,
+                  selected ? styles.rowSelected : null,
+                  pressed ? styles.pressed : null,
+                ]}
+              >
+                <View style={styles.thumb}>
+                  <Ionicons name="barcode-outline" size={19} color={colors.inkSoft} />
+                </View>
+                <View style={styles.rowCopy}>
+                  <Text style={styles.brand}>{firearm.manufacturer}</Text>
+                  <Text style={styles.model}>{firearm.exactModel}</Text>
+                  <Text style={styles.meta}>
+                    {categoryLabel(firearm.category)} · {money(firearm.knownPriceCents)} · {firearm.knownWeightGrams ?? "—"} g
+                  </Text>
+                  <Text style={styles.interfaces} numberOfLines={2}>
+                    {firearm.provides.map((item) => interfaceLabel(item.interfaceId)).join(" · ")}
+                  </Text>
+                </View>
+                <View style={selected ? styles.checkSelected : styles.check}>
+                  {selected ? <Ionicons name="checkmark" size={14} color={colors.white} /> : null}
+                </View>
+              </Pressable>
+            );
+          })
+        )}
+      </ScrollView>
     </ModalScreen>
   );
 }
 
+function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => [styles.chip, active ? styles.chipActive : null, pressed ? styles.pressed : null]}
+    >
+      <Text style={[styles.chipText, active ? styles.chipTextActive : null]}>{label}</Text>
+    </Pressable>
+  );
+}
+
 const styles = StyleSheet.create({
-  helper: { color: colors.inkSoft, fontFamily, fontSize: 14, lineHeight: 20, marginBottom: spacing.md },
-  selectedCard: { borderColor: colors.accent, borderWidth: 1 },
-  selectedTop: { flexDirection: "row", alignItems: "flex-start", gap: spacing.md },
-  copy: { flex: 1 },
-  maker: { color: colors.inkFaint, fontFamily, fontSize: 12 },
-  model: { color: colors.ink, fontFamily, fontSize: 17, lineHeight: 22, fontWeight: "600", marginTop: 2 },
-  check: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
+  searchWrap: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.xs },
+  helper: { color: colors.inkSoft, fontFamily, fontSize: 13, lineHeight: 18 },
+  searchField: {
+    minHeight: 42,
+    flexDirection: "row",
     alignItems: "center",
+    gap: spacing.xs,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.sm,
+    backgroundColor: colors.surfaceMuted,
+  },
+  searchInput: { flex: 1, color: colors.ink, fontFamily, fontSize: 15, paddingVertical: 8 },
+  chips: { gap: spacing.xs, paddingVertical: 2 },
+  chip: {
+    minHeight: 32,
     justifyContent: "center",
-    backgroundColor: colors.accent,
+    paddingHorizontal: spacing.sm,
+    borderRadius: radius.pill,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
   },
-  metrics: {
-    marginTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line,
-  },
-  sectionLabel: {
-    color: colors.ink,
-    fontFamily,
-    fontSize: 18,
-    fontWeight: "600",
-    letterSpacing: -0.2,
-    marginTop: spacing.lg,
-    marginBottom: spacing.xs,
-  },
-  interfaceCard: { paddingVertical: spacing.xxs },
-  interfaceRow: {
-    minHeight: 54,
+  chipActive: { backgroundColor: colors.ink, borderColor: colors.ink },
+  chipText: { color: colors.inkSoft, fontFamily, fontSize: 13, fontWeight: "500" },
+  chipTextActive: { color: colors.white },
+  list: { padding: spacing.md, paddingBottom: spacing.xxl, gap: spacing.xs },
+  noResults: { color: colors.inkSoft, fontFamily, fontSize: 14, textAlign: "center", paddingVertical: spacing.xl },
+  row: {
     flexDirection: "row",
     alignItems: "center",
     gap: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
+    padding: spacing.sm,
+    borderRadius: radius.md,
+    backgroundColor: colors.surface,
+    borderWidth: StyleSheet.hairlineWidth,
+    borderColor: colors.line,
   },
-  interfaceRowLast: { borderBottomWidth: 0 },
-  interfaceIcon: {
-    width: 32,
-    height: 32,
-    borderRadius: radius.sm - 2,
+  rowSelected: { borderColor: colors.accent, borderWidth: 1 },
+  pressed: { opacity: 0.7 },
+  thumb: {
+    width: 48,
+    height: 48,
+    borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceMuted,
   },
-  interfaceName: { color: colors.ink, fontFamily, fontSize: 15, fontWeight: "600" },
-  interfaceMeta: { color: colors.inkSoft, fontFamily, fontSize: 12, marginTop: 2 },
-  footnote: {
-    color: colors.inkFaint,
-    fontFamily,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: spacing.lg,
+  rowCopy: { flex: 1 },
+  brand: { color: colors.inkFaint, fontFamily, fontSize: 12 },
+  model: { color: colors.ink, fontFamily, fontSize: 15, lineHeight: 20, fontWeight: "600", marginTop: 1 },
+  meta: { color: colors.inkSoft, fontFamily, fontSize: 12, marginTop: 3 },
+  interfaces: { color: colors.inkFaint, fontFamily, fontSize: 11, lineHeight: 15, marginTop: 3 },
+  check: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: colors.line },
+  checkSelected: {
+    width: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: "center",
+    justifyContent: "center",
+    backgroundColor: colors.accent,
   },
 });
