@@ -47,4 +47,15 @@ jobs:
         if: steps.mobile_typecheck.outcome == 'failure'
         run: cat mobile-typecheck.log && exit 1
       - name: Export iOS JavaScript bundle
-        run: pnpm --filter @fitment/mobile export:ios
+        id: ios_export
+        continue-on-error: true
+        run: pnpm --filter @fitment/mobile export:ios > ios-export.log 2>&1
+      - name: Preserve iOS export log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-export-log
+          path: ios-export.log
+      - name: Report iOS export failure
+        if: steps.ios_export.outcome == 'failure'
+        run: cat ios-export.log && exit 1
