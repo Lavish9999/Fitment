@@ -2,40 +2,49 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import * as Haptics from "expo-haptics";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 
-import {
-  demoAccessories,
-  demoAdapters,
-  demoEvidence,
-  demoExclusions,
-  demoHost,
-  demoProductsById,
-} from "@fitment/catalog";
 import { evaluateCompatibility } from "@fitment/compatibility-engine";
 import type { CatalogVariant, CompatibilityEvaluation, DimensionCheck } from "@fitment/domain";
 
-export const ENGINE_VERSION = "0.2.0-demo";
-const CURRENT_BUILD_KEY = "fitment.mobile.current-build.v2";
-const SAVED_BUILDS_KEY = "fitment.mobile.saved-builds.v2";
+import { useCatalog } from "../catalog/CatalogProvider";
 
-const demoDimensionChecks: DimensionCheck[] = [
+export const ENGINE_VERSION = "0.3.0-phase1";
+const CURRENT_BUILD_KEY = "fitment.mobile.current-build.v3";
+const SAVED_BUILDS_KEY = "fitment.mobile.saved-builds.v3";
+const SELECTED_HOST_KEY = "fitment.mobile.selected-host.v1";
+
+const previewDimensionChecks: DimensionCheck[] = [
   {
     code: "CONTROL_CLEARANCE",
     label: "Control clearance",
     result: "UNKNOWN",
     critical: false,
-    explanation:
-      "Control clearance has not been physically verified for this demonstration combination.",
+    explanation: "Control clearance has not been physically verified for this preview combination.",
     evidenceSourceIds: [],
   },
 ];
 
+export interface SavedEvaluationSnapshot {
+  accessoryId: string;
+  status: CompatibilityEvaluation["status"];
+  confidenceScore: number;
+  engineVersion: string;
+}
+
 export interface SavedBuild {
   id: string;
   name: string;
+  hostId: string;
   componentIds: string[];
   engineVersion: string;
+  catalogRevision: number;
+  evaluations: SavedEvaluationSnapshot[];
   savedAt: string;
   updatedAt: string;
+}
+
+interface PersistedCurrentBuild {
+  hostId: string;
+  componentIds: string[];
 }
 
 interface BuildTotals {
@@ -46,6 +55,9 @@ interface BuildTotals {
 }
 
 interface FitmentContextValue {
+  firearms: CatalogVariant[];
+  accessories: CatalogVariant[];
+  selectedHost: CatalogVariant;
   selectedAccessory: CatalogVariant;
   evaluation: CompatibilityEvaluation;
   evaluations: ReadonlyMap<string, CompatibilityEvaluation>;
@@ -54,6 +66,12 @@ interface FitmentContextValue {
   savedBuilds: SavedBuild[];
   totals: BuildTotals;
   blocked: boolean;
+  catalogRevision: number;
+  catalogMode: "PREVIEW" | "PRODUCTION";
+  catalogSource: string;
+  catalogError: Error | null;
+  catalogRefreshing: boolean;
+  selectHost: (id: string) => void;
   selectAccessory: (id: string) => void;
   addSelected: (includeRequired: boolean) => void;
   removeFromBuild: (id: string) => void;
@@ -63,53 +81,63 @@ interface FitmentContextValue {
   renameBuild: (id: string, name: string) => void;
   duplicateBuild: (id: string) => void;
   deleteBuild: (id: string) => void;
+  refreshCatalog: () => Promise<void>;
+  productById: (id: string) => CatalogVariant | undefined;
 }
 
 const FitmentContext = createContext<FitmentContextValue | null>(null);
 
-function productsFromIds(ids: string[]): CatalogVariant[] {
-  return ids
-    .map((id) => demoProductsById.get(id))
-    .filter((item): item is CatalogVariant => Boolean(item));
-}
-
 export function FitmentProvider({ children }: { children: ReactNode }) {
-  const [selectedAccessoryId, setSelectedAccessoryId] = useState(demoAccessories[0].id);
+  const {
+    catalog,
+    productsById,
+    source,
+    isRefreshing,
+    error,
+    refresh,
+  } = useCatalog();
+  const defaultHost = catalog.firearms[0];
+  const defaultAccessory = catalog.accessories[0];
+
+  const [selectedHostId, setSelectedHostId] = useState(defaultHost.id);
+  const [selectedAccessoryId, setSelectedAccessoryId] = useState(defaultAccessory.id);
   const [buildItems, setBuildItems] = useState<CatalogVariant[]>([]);
   const [savedBuilds, setSavedBuilds] = useState<SavedBuild[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
+  const selectedHost =
+    catalog.firearms.find((item) => item.id === selectedHostId) ?? defaultHost;
   const selectedAccessory =
-    demoAccessories.find((item) => item.id === selectedAccessoryId) ?? demoAccessories[0];
+    catalog.accessories.find((item) => item.id === selectedAccessoryId) ?? defaultAccessory;
 
   const evaluations = useMemo(
     () =>
       new Map(
-        demoAccessories.map((accessory) => [
+        catalog.accessories.map((accessory) => [
           accessory.id,
           evaluateCompatibility({
-            host: demoHost,
+            host: selectedHost,
             accessory,
-            adapters: demoAdapters,
-            exclusions: demoExclusions,
-            evidenceSources: demoEvidence,
+            adapters: catalog.adapters,
+            exclusions: catalog.exclusions,
+            evidenceSources: catalog.evidenceSources,
             adapterGraphCompleteness: "PARTIAL",
             engineVersion: ENGINE_VERSION,
-            dimensionChecks: demoDimensionChecks,
+            dimensionChecks: accessory.id.includes("demo") ? previewDimensionChecks : [],
           }),
         ]),
       ),
-    [],
+    [catalog, selectedHost],
   );
 
-  const evaluation = evaluations.get(selectedAccessory.id) ?? evaluations.get(demoAccessories[0].id)!;
+  const evaluation = evaluations.get(selectedAccessory.id) ?? evaluations.get(defaultAccessory.id)!;
 
   const requiredProducts = useMemo(
     () =>
       evaluation.requiredComponents
-        .map((component) => demoProductsById.get(component.productVariantId))
+        .map((component) => productsById.get(component.productVariantId))
         .filter((item): item is CatalogVariant => Boolean(item)),
-    [evaluation],
+    [evaluation, productsById],
   );
 
   const blocked =
@@ -117,21 +145,56 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     async function restore() {
-      const [currentRaw, savedRaw] = await Promise.all([
+      const [selectedHostRaw, currentRaw, savedRaw] = await Promise.all([
+        AsyncStorage.getItem(SELECTED_HOST_KEY),
         AsyncStorage.getItem(CURRENT_BUILD_KEY),
         AsyncStorage.getItem(SAVED_BUILDS_KEY),
       ]);
 
       try {
+        const restoredHostId =
+          selectedHostRaw && catalog.firearms.some((host) => host.id === selectedHostRaw)
+            ? selectedHostRaw
+            : defaultHost.id;
+        setSelectedHostId(restoredHostId);
+
         if (currentRaw) {
-          const ids = JSON.parse(currentRaw) as string[];
-          if (Array.isArray(ids)) setBuildItems(productsFromIds(ids));
+          const parsed = JSON.parse(currentRaw) as PersistedCurrentBuild | string[];
+          const current = Array.isArray(parsed)
+            ? { hostId: restoredHostId, componentIds: parsed }
+            : parsed;
+          if (catalog.firearms.some((host) => host.id === current.hostId)) {
+            setSelectedHostId(current.hostId);
+          }
+          if (Array.isArray(current.componentIds)) {
+            setBuildItems(
+              current.componentIds
+                .map((id) => productsById.get(id))
+                .filter((item): item is CatalogVariant => Boolean(item)),
+            );
+          }
         }
+
         if (savedRaw) {
-          const saved = JSON.parse(savedRaw) as SavedBuild[];
+          const saved = JSON.parse(savedRaw) as Array<Partial<SavedBuild> & { componentIds?: string[] }>;
           if (Array.isArray(saved)) {
             setSavedBuilds(
-              saved.map((build) => ({ ...build, updatedAt: build.updatedAt ?? build.savedAt })),
+              saved
+                .filter((build) => build.id && Array.isArray(build.componentIds))
+                .map((build, index) => ({
+                  id: build.id!,
+                  name: build.name ?? `Build ${index + 1}`,
+                  hostId:
+                    build.hostId && catalog.firearms.some((host) => host.id === build.hostId)
+                      ? build.hostId
+                      : restoredHostId,
+                  componentIds: build.componentIds ?? [],
+                  engineVersion: build.engineVersion ?? ENGINE_VERSION,
+                  catalogRevision: build.catalogRevision ?? catalog.revision,
+                  evaluations: build.evaluations ?? [],
+                  savedAt: build.savedAt ?? new Date().toISOString(),
+                  updatedAt: build.updatedAt ?? build.savedAt ?? new Date().toISOString(),
+                })),
             );
           }
         }
@@ -141,12 +204,21 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
     }
 
     void restore();
-  }, []);
+  }, [catalog, defaultHost.id, productsById]);
 
   useEffect(() => {
     if (!hydrated) return;
-    void AsyncStorage.setItem(CURRENT_BUILD_KEY, JSON.stringify(buildItems.map((item) => item.id)));
-  }, [buildItems, hydrated]);
+    void AsyncStorage.setItem(SELECTED_HOST_KEY, selectedHost.id);
+  }, [hydrated, selectedHost.id]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    const current: PersistedCurrentBuild = {
+      hostId: selectedHost.id,
+      componentIds: buildItems.map((item) => item.id),
+    };
+    void AsyncStorage.setItem(CURRENT_BUILD_KEY, JSON.stringify(current));
+  }, [buildItems, hydrated, selectedHost.id]);
 
   useEffect(() => {
     if (!hydrated) return;
@@ -154,8 +226,8 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
   }, [savedBuilds, hydrated]);
 
   const totals = useMemo<BuildTotals>(() => {
-    const prices = [demoHost.knownPriceCents, ...buildItems.map((item) => item.knownPriceCents)];
-    const weights = [demoHost.knownWeightGrams, ...buildItems.map((item) => item.knownWeightGrams)];
+    const prices = [selectedHost.knownPriceCents, ...buildItems.map((item) => item.knownPriceCents)];
+    const weights = [selectedHost.knownWeightGrams, ...buildItems.map((item) => item.knownWeightGrams)];
 
     const total: BuildTotals = {
       unknownPrices: prices.filter((value) => value === undefined).length,
@@ -170,9 +242,18 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
     }
 
     return total;
-  }, [buildItems]);
+  }, [buildItems, selectedHost]);
+
+  function selectHost(id: string) {
+    const next = catalog.firearms.find((host) => host.id === id);
+    if (!next || next.id === selectedHost.id) return;
+    setSelectedHostId(next.id);
+    setBuildItems([]);
+    void Haptics.selectionAsync();
+  }
 
   function selectAccessory(id: string) {
+    if (!catalog.accessories.some((item) => item.id === id)) return;
     setSelectedAccessoryId(id);
     void Haptics.selectionAsync();
   }
@@ -200,14 +281,33 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
+  function currentEvaluationSnapshots(): SavedEvaluationSnapshot[] {
+    return buildItems
+      .map((item) => {
+        const itemEvaluation = evaluations.get(item.id);
+        return itemEvaluation
+          ? {
+              accessoryId: item.id,
+              status: itemEvaluation.status,
+              confidenceScore: itemEvaluation.confidenceScore,
+              engineVersion: itemEvaluation.engineVersion,
+            }
+          : undefined;
+      })
+      .filter((item): item is SavedEvaluationSnapshot => Boolean(item));
+  }
+
   function saveCurrentBuild() {
     const now = new Date().toISOString();
     setSavedBuilds((current) => {
       const record: SavedBuild = {
         id: String(Date.now()),
-        name: `Build ${current.length + 1}`,
+        name: `${selectedHost.family} Build ${current.length + 1}`,
+        hostId: selectedHost.id,
         componentIds: buildItems.map((item) => item.id),
         engineVersion: ENGINE_VERSION,
+        catalogRevision: catalog.revision,
+        evaluations: currentEvaluationSnapshots(),
         savedAt: now,
         updatedAt: now,
       };
@@ -219,7 +319,14 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
   function loadBuild(id: string) {
     const build = savedBuilds.find((item) => item.id === id);
     if (!build) return;
-    setBuildItems(productsFromIds(build.componentIds));
+    if (catalog.firearms.some((host) => host.id === build.hostId)) {
+      setSelectedHostId(build.hostId);
+    }
+    setBuildItems(
+      build.componentIds
+        .map((componentId) => productsById.get(componentId))
+        .filter((item): item is CatalogVariant => Boolean(item)),
+    );
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
@@ -235,17 +342,19 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
 
   function duplicateBuild(id: string) {
     setSavedBuilds((current) => {
-      const source = current.find((build) => build.id === id);
-      if (!source) return current;
+      const sourceBuild = current.find((build) => build.id === id);
+      if (!sourceBuild) return current;
       const now = new Date().toISOString();
-      const copy: SavedBuild = {
-        ...source,
-        id: String(Date.now()),
-        name: `${source.name} copy`,
-        savedAt: now,
-        updatedAt: now,
-      };
-      return [copy, ...current];
+      return [
+        {
+          ...sourceBuild,
+          id: String(Date.now()),
+          name: `${sourceBuild.name} copy`,
+          savedAt: now,
+          updatedAt: now,
+        },
+        ...current,
+      ];
     });
     void Haptics.selectionAsync();
   }
@@ -257,6 +366,9 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
 
   const value = useMemo<FitmentContextValue>(
     () => ({
+      firearms: catalog.firearms,
+      accessories: catalog.accessories,
+      selectedHost,
       selectedAccessory,
       evaluation,
       evaluations,
@@ -265,6 +377,12 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
       savedBuilds,
       totals,
       blocked,
+      catalogRevision: catalog.revision,
+      catalogMode: catalog.mode,
+      catalogSource: source,
+      catalogError: error,
+      catalogRefreshing: isRefreshing,
+      selectHost,
       selectAccessory,
       addSelected,
       removeFromBuild,
@@ -274,9 +392,26 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
       renameBuild,
       duplicateBuild,
       deleteBuild,
+      refreshCatalog: refresh,
+      productById: (id) => productsById.get(id),
     }),
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-    [selectedAccessory, evaluation, evaluations, requiredProducts, buildItems, savedBuilds, totals, blocked],
+    [
+      catalog,
+      selectedHost,
+      selectedAccessory,
+      evaluation,
+      evaluations,
+      requiredProducts,
+      buildItems,
+      savedBuilds,
+      totals,
+      blocked,
+      source,
+      error,
+      isRefreshing,
+      refresh,
+      productsById,
+    ],
   );
 
   return <FitmentContext.Provider value={value}>{children}</FitmentContext.Provider>;
