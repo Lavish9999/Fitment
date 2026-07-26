@@ -43,6 +43,7 @@ export const tabBarMetrics = {
   height: 58,
   horizontalInset: 28,
   minimumBottomOffset: 8,
+  bottomOffset: 8,
   clearance: 22,
 } as const;
 
