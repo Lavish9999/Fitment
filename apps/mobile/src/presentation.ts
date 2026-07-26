@@ -1,4 +1,4 @@
-import { demoProductsById } from "@fitment/catalog";
+import { phase1ProductsById } from "@fitment/catalog";
 import type { CatalogVariant, CompatibilityEvaluation } from "@fitment/domain";
 
 import { colors } from "./theme";
@@ -27,8 +27,11 @@ export function categoryLabel(category: string): string {
 
 const interfaceLabels: Record<string, string> = {
   MOS_PLATE_SYSTEM: "MOS optic plate system",
+  GLOCK_MOS_STANDARD: "GLOCK MOS optic system",
   RM_RMR_FOOTPRINT: "RMR footprint",
-  GLOCK_UNIVERSAL_RAIL: "Glock accessory rail",
+  SHIELD_RMSC_FOOTPRINT: "Shield RMSc footprint",
+  GLOCK_UNIVERSAL_RAIL: "GLOCK accessory rail",
+  PICATINNY_1913_COMPACT: "compact 1913 accessory rail",
 };
 
 export function interfaceLabel(interfaceId: string): string {
@@ -43,18 +46,16 @@ export function interfaceLabel(interfaceId: string): string {
 }
 
 export function productLabel(productVariantId: string): string {
-  const product = demoProductsById.get(productVariantId);
+  const product = phase1ProductsById.get(productVariantId);
   return product ? product.family : productVariantId;
 }
 
-// Replaces raw interface and product identifiers inside engine-authored
-// sentences so technical reasons read as consumer copy.
 export function humanizeTechnicalText(text: string): string {
   let result = text;
   for (const [id, label] of Object.entries(interfaceLabels)) {
     result = result.replaceAll(id, label);
   }
-  for (const [id, product] of demoProductsById) {
+  for (const [id, product] of phase1ProductsById) {
     result = result.replaceAll(id, product.family);
   }
   return result;
@@ -69,20 +70,40 @@ export function statusPresentation(evaluation: CompatibilityEvaluation): StatusP
     case "VERIFIED_DIRECT":
       return { label: "Verified fit", foreground: colors.success, background: colors.successSoft };
     case "VERIFIED_WITH_ADAPTER":
-      return { label: "Fits with required adapter", foreground: colors.success, background: colors.successSoft };
+      return {
+        label: "Fits with required adapter",
+        foreground: colors.success,
+        background: colors.successSoft,
+      };
     case "LIKELY_COMPATIBLE":
-      return { label: "Likely fit — unverified", foreground: colors.warning, background: colors.warningSoft };
+      return {
+        label: "Likely fit — unverified",
+        foreground: colors.warning,
+        background: colors.warningSoft,
+      };
     case "NEEDS_MEASUREMENT":
-      return { label: "Measurement required", foreground: colors.warning, background: colors.warningSoft };
+      return {
+        label: "Measurement required",
+        foreground: colors.warning,
+        background: colors.warningSoft,
+      };
     case "CONFLICT_DETECTED":
       return { label: "Known conflict", foreground: colors.danger, background: colors.dangerSoft };
     case "NOT_COMPATIBLE":
       return { label: "Not compatible", foreground: colors.danger, background: colors.dangerSoft };
     case "UNKNOWN":
       if (hasInterfaceMatch(evaluation)) {
-        return { label: "Match found — unverified", foreground: colors.warning, background: colors.warningSoft };
+        return {
+          label: "Match found — unverified",
+          foreground: colors.warning,
+          background: colors.warningSoft,
+        };
       }
-      return { label: "Insufficient information", foreground: colors.inkSoft, background: colors.surfaceMuted };
+      return {
+        label: "Insufficient information",
+        foreground: colors.inkSoft,
+        background: colors.surfaceMuted,
+      };
   }
 }
 
@@ -90,11 +111,11 @@ export function resultHeadline(evaluation: CompatibilityEvaluation): string {
   const adapters = evaluation.adapterPath.length;
   switch (evaluation.status) {
     case "VERIFIED_DIRECT":
-      return "This component fits directly.";
+      return "This component is verified to fit directly.";
     case "VERIFIED_WITH_ADAPTER":
       return adapters === 1
-        ? "This component fits using one required adapter."
-        : `This component fits using ${adapters} required adapters.`;
+        ? "This component is verified to fit using one required adapter."
+        : `This component is verified to fit using ${adapters} required adapters.`;
     case "LIKELY_COMPATIBLE":
       return "This component likely fits, but the exact pairing is not fully verified.";
     case "NEEDS_MEASUREMENT":
@@ -106,8 +127,8 @@ export function resultHeadline(evaluation: CompatibilityEvaluation): string {
     case "UNKNOWN":
       if (adapters > 0) {
         return adapters === 1
-          ? "The connection works with one adapter, but it is not verified."
-          : `The connection works with ${adapters} adapters, but it is not verified.`;
+          ? "The mounting interfaces align using one adapter, but this combination is not verified."
+          : `The mounting interfaces align using ${adapters} adapters, but this combination is not verified.`;
       }
       if (evaluation.directMatches.length > 0) {
         return "The mounting interface matches, but the pairing is not verified.";
@@ -125,7 +146,9 @@ export function resultExplanation(
 
   if (evaluation.status === "CONFLICT_DETECTED" || evaluation.status === "NOT_COMPATIBLE") {
     const reason = evaluation.knownConflicts[0] ?? evaluation.mismatches[0];
-    return reason ? humanizeTechnicalText(reason) : "The catalog records a conflict for this exact pairing.";
+    return reason
+      ? humanizeTechnicalText(reason)
+      : "The catalog records a conflict for this exact pairing.";
   }
 
   if (evaluation.adapterPath.length > 0 && requirementLabel) {
