@@ -2,7 +2,7 @@
 
 **Know what fits before you buy.**
 
-FITMENT is an iOS-first mobile application for evidence-driven firearm accessory compatibility, build planning, private ownership records, and shopping research. The production customer experience is React Native with Expo—not a consumer website.
+FITMENT is an iOS-first mobile application for evidence-driven firearm accessory compatibility, build planning, private ownership records, and shopping research. The customer product is built with React Native and Expo—not as a consumer website.
 
 > Demonstration records are marked `DEMO_UNVERIFIED`. They are not manufacturer claims and must not be used as purchase, installation, safety, or legal guidance.
 
@@ -26,7 +26,6 @@ FITMENT is an iOS-first mobile application for evidence-driven firearm accessory
 ```text
 apps/
   mobile/          # iOS-first customer application
-  web/             # legacy Phase 1 test harness; not the product surface
 packages/
   domain/
   compatibility-engine/
@@ -37,8 +36,6 @@ supabase/
 docs/
 tests/
 ```
-
-The web harness is excluded from the product CI path and is scheduled for removal after the native vertical slice is verified on-device.
 
 ## Prerequisites
 
