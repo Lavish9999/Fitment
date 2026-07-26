@@ -2,12 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { StyleSheet, Text, View } from "react-native";
 
-import { demoHost } from "@fitment/catalog";
-
 import {
   AppHeader,
   Card,
-  DemoBanner,
   PrimaryButton,
   Screen,
   SectionTitle,
@@ -19,13 +16,27 @@ import { colors, fontFamily, spacing } from "../../src/theme";
 
 export default function ExploreScreen() {
   const router = useRouter();
-  const { selectedAccessory, evaluation, buildItems, savedBuilds } = useFitment();
+  const {
+    selectedHost,
+    selectedAccessory,
+    evaluation,
+    buildItems,
+    savedBuilds,
+    catalogMode,
+    catalogRefreshing,
+  } = useFitment();
   const presentation = statusPresentation(evaluation);
 
   return (
     <Screen>
       <AppHeader title="Explore" subtitle="Know what fits before you buy." />
-      <DemoBanner />
+      <View style={styles.catalogBanner}>
+        <Ionicons name="shield-checkmark-outline" size={14} color={colors.accent} />
+        <Text style={styles.catalogText}>
+          {catalogMode === "PREVIEW" ? "Preview catalog" : "Live catalog"} · verification shown per item
+          {catalogRefreshing ? " · refreshing" : ""}
+        </Text>
+      </View>
 
       <Card style={styles.actionCard}>
         <View style={styles.actionTop}>
@@ -44,9 +55,9 @@ export default function ExploreScreen() {
       <SectionTitle>Current firearm</SectionTitle>
       <SelectorRow
         icon="barcode-outline"
-        eyebrow={demoHost.manufacturer}
-        title={demoHost.exactModel}
-        detail={`${money(demoHost.knownPriceCents)} · ${demoHost.knownWeightGrams ?? "—"} g`}
+        eyebrow={selectedHost.manufacturer}
+        title={selectedHost.exactModel}
+        detail={`${money(selectedHost.knownPriceCents)} · ${selectedHost.knownWeightGrams ?? "—"} g`}
         onPress={() => router.push("/select-firearm")}
       />
 
@@ -80,6 +91,14 @@ export default function ExploreScreen() {
 }
 
 const styles = StyleSheet.create({
+  catalogBanner: {
+    minHeight: 28,
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: spacing.sm,
+  },
+  catalogText: { flex: 1, color: colors.inkFaint, fontFamily, fontSize: 12, fontWeight: "500" },
   actionCard: { gap: spacing.sm },
   actionTop: { flexDirection: "row", alignItems: "center", gap: spacing.xs },
   actionIcon: {
@@ -99,11 +118,5 @@ const styles = StyleSheet.create({
     fontWeight: "600",
     letterSpacing: -0.4,
   },
-  actionBody: {
-    color: colors.inkSoft,
-    fontFamily,
-    fontSize: 14,
-    lineHeight: 20,
-    marginBottom: spacing.xxs,
-  },
+  actionBody: { color: colors.inkSoft, fontFamily, fontSize: 14, lineHeight: 20, marginBottom: spacing.xxs },
 });
