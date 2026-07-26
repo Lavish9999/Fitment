@@ -8,7 +8,7 @@
     "ios": "expo start --ios",
     "typecheck": "tsc --noEmit",
     "export:ios": "expo export --platform ios --output-dir dist-ios",
-    "doctor": "expo-doctor"
+    "doctor": "npx expo-doctor@latest"
   },
   "dependencies": {
     "@fitment/catalog": "workspace:*",
@@ -28,7 +28,6 @@
   },
   "devDependencies": {
     "@types/react": "~19.1.0",
-    "expo-doctor": "^1.17.11",
     "typescript": "~5.9.2"
   }
 }
