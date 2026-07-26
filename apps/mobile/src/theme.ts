@@ -16,7 +16,7 @@ export const colors = {
   warningSoft: "#F6ECDA",
   danger: "#A8433C",
   dangerSoft: "#F6E5E2",
-  nav: "#1C1B18",
+  nav: "#191916",
   white: "#FFFFFF",
 } as const;
 
@@ -40,13 +40,14 @@ export const radius = {
 export const fontFamily = Platform.OS === "ios" ? "System" : "sans-serif";
 
 export const tabBarMetrics = {
-  height: 64,
-  bottomOffset: 8,
-  clearance: 28,
+  height: 58,
+  horizontalInset: 28,
+  minimumBottomOffset: 8,
+  clearance: 22,
 } as const;
 
 export function tabBarBottom(safeAreaBottom: number): number {
-  return Math.max(safeAreaBottom - 6, tabBarMetrics.bottomOffset);
+  return Math.max(safeAreaBottom - 14, tabBarMetrics.minimumBottomOffset);
 }
 
 export function screenBottomPadding(safeAreaBottom: number): number {
