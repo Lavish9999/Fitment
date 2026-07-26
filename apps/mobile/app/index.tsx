@@ -29,22 +29,13 @@ import type {
 const ENGINE_VERSION = "0.1.0-demo";
 const STORAGE_KEY = "fitment.mobile.saved-builds.v1";
 
-interface SavedBuild {
-  id: string;
-  name: string;
-  hostId: string;
-  componentIds: string[];
-  engineVersion: string;
-  savedAt: string;
-}
-
-const palette = {
-  background: "#F3F3EF",
+const colors = {
+  bg: "#F3F3EF",
   surface: "#FFFFFF",
-  elevated: "#F8F8F5",
+  soft: "#F8F8F5",
   text: "#111111",
-  secondary: "#666862",
-  tertiary: "#8B8D87",
+  muted: "#666862",
+  faint: "#8B8D87",
   border: "#DDDCD6",
   dark: "#171817",
   green: "#147A43",
@@ -57,7 +48,21 @@ const palette = {
   redSoft: "#FAE9E7",
 };
 
-function formatMoney(cents?: number): string {
+interface SavedBuild {
+  id: string;
+  name: string;
+  componentIds: string[];
+  engineVersion: string;
+  savedAt: string;
+}
+
+interface StatusPresentation {
+  label: string;
+  foreground: string;
+  background: string;
+}
+
+function money(cents?: number): string {
   if (cents === undefined) return "Unknown";
   return new Intl.NumberFormat("en-US", {
     style: "currency",
@@ -65,33 +70,35 @@ function formatMoney(cents?: number): string {
   }).format(cents / 100);
 }
 
-function statusPresentation(
-  evaluation: CompatibilityEvaluation,
-): { label: string; foreground: string; background: string } {
+function getStatus(evaluation: CompatibilityEvaluation): StatusPresentation {
   const status: CompatibilityStatus = evaluation.status;
 
   if (status === "VERIFIED_DIRECT") {
-    return { label: "Verified direct fit", foreground: palette.green, background: palette.greenSoft };
+    return { label: "Verified direct fit", foreground: colors.green, background: colors.greenSoft };
   }
   if (status === "VERIFIED_WITH_ADAPTER") {
-    return { label: "Verified with adapter", foreground: palette.amber, background: palette.amberSoft };
+    return { label: "Verified with adapter", foreground: colors.amber, background: colors.amberSoft };
   }
   if (status === "LIKELY_COMPATIBLE") {
-    return { label: "Likely compatible", foreground: palette.amber, background: palette.amberSoft };
+    return { label: "Likely compatible", foreground: colors.amber, background: colors.amberSoft };
   }
   if (status === "NEEDS_MEASUREMENT") {
-    return { label: "Needs measurement", foreground: palette.slate, background: palette.slateSoft };
+    return { label: "Needs measurement", foreground: colors.slate, background: colors.slateSoft };
   }
   if (status === "CONFLICT_DETECTED") {
-    return { label: "Conflict detected", foreground: palette.red, background: palette.redSoft };
+    return { label: "Conflict detected", foreground: colors.red, background: colors.redSoft };
   }
   if (status === "NOT_COMPATIBLE") {
-    return { label: "Not compatible", foreground: palette.red, background: palette.redSoft };
+    return { label: "Not compatible", foreground: colors.red, background: colors.redSoft };
   }
   if (evaluation.directMatches.length > 0 || evaluation.adapterPath.length > 0) {
-    return { label: "Interface match · unverified", foreground: palette.slate, background: palette.slateSoft };
+    return {
+      label: "Interface match · unverified",
+      foreground: colors.slate,
+      background: colors.slateSoft,
+    };
   }
-  return { label: "Unknown", foreground: palette.slate, background: palette.slateSoft };
+  return { label: "Unknown", foreground: colors.slate, background: colors.slateSoft };
 }
 
 function SectionLabel({ children }: { children: string }) {
@@ -100,7 +107,7 @@ function SectionLabel({ children }: { children: string }) {
 
 function DataRow({ label, value, last = false }: { label: string; value: string; last?: boolean }) {
   return (
-    <View style={[styles.dataRow, last && styles.dataRowLast]}>
+    <View style={last ? styles.dataRowLast : styles.dataRow}>
       <Text style={styles.dataLabel}>{label}</Text>
       <Text style={styles.dataValue}>{value}</Text>
     </View>
@@ -109,7 +116,7 @@ function DataRow({ label, value, last = false }: { label: string; value: string;
 
 function BulletList({ items, empty }: { items: string[]; empty: string }) {
   if (items.length === 0) {
-    return <Text style={styles.bodyMuted}>{empty}</Text>;
+    return <Text style={styles.mutedBody}>{empty}</Text>;
   }
 
   return (
@@ -125,17 +132,17 @@ function BulletList({ items, empty }: { items: string[]; empty: string }) {
 }
 
 export default function BuilderScreen() {
-  const firstAccessoryId = demoAccessories[0]?.id ?? "";
-  const [selectedAccessoryId, setSelectedAccessoryId] = useState(firstAccessoryId);
-  const [pickerOpen, setPickerOpen] = useState(false);
+  const [selectedAccessoryId, setSelectedAccessoryId] = useState(demoAccessories[0]?.id ?? "");
+  const [pickerVisible, setPickerVisible] = useState(false);
   const [buildItems, setBuildItems] = useState<CatalogVariant[]>([]);
   const [savedBuilds, setSavedBuilds] = useState<SavedBuild[]>([]);
 
   const selectedAccessory =
-    demoAccessories.find((product) => product.id === selectedAccessoryId) ?? demoAccessories[0];
+    demoAccessories.find((item) => item.id === selectedAccessoryId) ?? demoAccessories[0];
 
   const evaluation = useMemo(() => {
     if (!selectedAccessory) return null;
+
     return evaluateCompatibility({
       host: demoHost,
       accessory: selectedAccessory,
@@ -159,9 +166,10 @@ export default function BuilderScreen() {
   }, [selectedAccessory]);
 
   useEffect(() => {
-    async function loadSavedBuilds() {
+    async function restoreBuilds() {
       const stored = await AsyncStorage.getItem(STORAGE_KEY);
       if (!stored) return;
+
       try {
         const parsed = JSON.parse(stored) as SavedBuild[];
         if (Array.isArray(parsed)) setSavedBuilds(parsed);
@@ -170,7 +178,7 @@ export default function BuilderScreen() {
       }
     }
 
-    void loadSavedBuilds();
+    void restoreBuilds();
   }, []);
 
   const totals = useMemo(() => {
@@ -194,62 +202,62 @@ export default function BuilderScreen() {
   if (!selectedAccessory || !evaluation) {
     return (
       <SafeAreaView style={styles.safeArea}>
-        <View style={styles.emptyScreen}>
+        <View style={styles.centered}>
           <Text style={styles.emptyTitle}>Catalog unavailable</Text>
-          <Text style={styles.bodyMuted}>No demonstration accessories are currently loaded.</Text>
+          <Text style={styles.mutedBody}>No demonstration accessories are loaded.</Text>
         </View>
       </SafeAreaView>
     );
   }
 
-  const presentation = statusPresentation(evaluation);
+  const presentation = getStatus(evaluation);
   const requiredProducts = evaluation.requiredComponents
-    .map((item) => demoProductsById.get(item.productVariantId))
-    .filter((item): item is CatalogVariant => Boolean(item));
+    .map((component) => demoProductsById.get(component.productVariantId))
+    .filter((component): component is CatalogVariant => Boolean(component));
 
-  const displayUnknowns = [...evaluation.unknowns];
+  const unresolved = [...evaluation.unknowns];
   if (
     evaluation.status === "UNKNOWN" &&
-    displayUnknowns.length === 0 &&
+    unresolved.length === 0 &&
     (evaluation.directMatches.length > 0 || evaluation.adapterPath.length > 0)
   ) {
-    displayUnknowns.push(
-      "The mounting interface matches, but the exact host and accessory combination is not backed by verified evidence.",
+    unresolved.push(
+      "The interface matches, but the exact firearm and accessory combination is not backed by verified evidence.",
     );
   }
 
-  const isBlocked = ["NOT_COMPATIBLE", "CONFLICT_DETECTED"].includes(evaluation.status);
+  const blocked =
+    evaluation.status === "NOT_COMPATIBLE" || evaluation.status === "CONFLICT_DETECTED";
 
-  function chooseAccessory(id: string) {
+  function selectAccessory(id: string) {
     setSelectedAccessoryId(id);
-    setPickerOpen(false);
+    setPickerVisible(false);
     void Haptics.selectionAsync();
   }
 
-  function addSelected(includeRequired: boolean) {
-    if (isBlocked) return;
+  function addToBuild(includeRequired: boolean) {
+    if (blocked) return;
 
     const additions = includeRequired
       ? [selectedAccessory, ...requiredProducts]
       : [selectedAccessory];
 
     setBuildItems((current) => {
-      const existingIds = new Set(current.map((item) => item.id));
-      return [...current, ...additions.filter((item) => !existingIds.has(item.id))];
+      const existing = new Set(current.map((item) => item.id));
+      return [...current, ...additions.filter((item) => !existing.has(item.id))];
     });
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
   }
 
-  function removeItem(id: string) {
+  function removeFromBuild(id: string) {
     setBuildItems((current) => current.filter((item) => item.id !== id));
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
   }
 
   async function saveBuild() {
     const record: SavedBuild = {
-      id: `${Date.now()}`,
+      id: String(Date.now()),
       name: `Build ${savedBuilds.length + 1}`,
-      hostId: demoHost.id,
       componentIds: buildItems.map((item) => item.id),
       engineVersion: ENGINE_VERSION,
       savedAt: new Date().toISOString(),
@@ -262,16 +270,16 @@ export default function BuilderScreen() {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
-      <View style={styles.appHeader}>
+      <View style={styles.header}>
         <Text style={styles.wordmark}>FITMENT</Text>
-        <View style={styles.demoPill}>
-          <Text style={styles.demoPillText}>DEMO DATA</Text>
+        <View style={styles.demoBadge}>
+          <Text style={styles.demoBadgeText}>DEMO DATA</Text>
         </View>
       </View>
 
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
       >
         <View style={styles.hero}>
@@ -285,11 +293,11 @@ export default function BuilderScreen() {
 
         <SectionLabel>EXACT FIREARM</SectionLabel>
         <View style={styles.card}>
-          <Text style={styles.cardKicker}>{demoHost.manufacturer}</Text>
+          <Text style={styles.kicker}>{demoHost.manufacturer}</Text>
           <Text style={styles.cardTitle}>{demoHost.exactModel}</Text>
-          <Text style={styles.cardMeta}>Exact variant · {demoHost.id}</Text>
+          <Text style={styles.meta}>Exact variant · {demoHost.id}</Text>
           <View style={styles.divider} />
-          <DataRow label="Known price" value={formatMoney(demoHost.knownPriceCents)} />
+          <DataRow label="Known price" value={money(demoHost.knownPriceCents)} />
           <DataRow
             label="Known weight"
             value={demoHost.knownWeightGrams === undefined ? "Unknown" : `${demoHost.knownWeightGrams} g`}
@@ -300,23 +308,23 @@ export default function BuilderScreen() {
         <SectionLabel>SELECT COMPONENT</SectionLabel>
         <Pressable
           accessibilityRole="button"
-          accessibilityLabel="Choose accessory"
-          style={({ pressed }) => [styles.selectionCard, pressed && styles.pressed]}
+          accessibilityLabel="Select an accessory"
+          style={({ pressed }) => [styles.selectionCard, pressed ? styles.pressed : null]}
           onPress={() => {
-            setPickerOpen(true);
+            setPickerVisible(true);
             void Haptics.selectionAsync();
           }}
         >
           <View style={styles.selectionCopy}>
-            <Text style={styles.cardKicker}>{selectedAccessory.manufacturer}</Text>
+            <Text style={styles.kicker}>{selectedAccessory.manufacturer}</Text>
             <Text style={styles.selectionTitle}>{selectedAccessory.exactModel}</Text>
-            <Text style={styles.cardMeta}>{selectedAccessory.category.replaceAll("_", " ")}</Text>
+            <Text style={styles.meta}>{selectedAccessory.category.replaceAll("_", " ")}</Text>
           </View>
           <Text style={styles.chevron}>›</Text>
         </Pressable>
 
-        <View style={styles.compactStats}>
-          <DataRow label="Product price" value={formatMoney(selectedAccessory.knownPriceCents)} />
+        <View style={styles.inlineStats}>
+          <DataRow label="Product price" value={money(selectedAccessory.knownPriceCents)} />
           <DataRow
             label="Known weight"
             value={
@@ -330,34 +338,34 @@ export default function BuilderScreen() {
 
         <SectionLabel>COMPATIBILITY</SectionLabel>
         <View style={styles.card}>
-          <View style={styles.statusHeader}>
-            <View style={[styles.statusPill, { backgroundColor: presentation.background }]}>
-              <Text style={[styles.statusText, { color: presentation.foreground }]}>
+          <View style={styles.statusRow}>
+            <View style={[styles.statusBadge, { backgroundColor: presentation.background }]}>
+              <Text style={[styles.statusBadgeText, { color: presentation.foreground }]}>
                 {presentation.label.toUpperCase()}
               </Text>
             </View>
             <Text style={styles.confidence}>{evaluation.confidenceScore}/100</Text>
           </View>
 
-          <Text style={styles.resultSummary}>{evaluation.summary}</Text>
-          <Text style={styles.confidenceExplanation}>
-            Confidence is limited because these records are demonstration data, not verified
-            manufacturer claims.
+          <Text style={styles.summary}>{evaluation.summary}</Text>
+          <Text style={styles.explanation}>
+            Confidence is limited because these are demonstration records, not verified manufacturer
+            claims.
           </Text>
 
           <View style={styles.divider} />
-          <Text style={styles.detailHeading}>Required components</Text>
+          <Text style={styles.detailTitle}>Required components</Text>
           <BulletList
             items={evaluation.requiredComponents.map(
-              (item) => `${item.productVariantId} — ${item.reason}`,
+              (component) => `${component.productVariantId} — ${component.reason}`,
             )}
             empty="No additional component is currently identified."
           />
 
-          <Text style={styles.detailHeading}>Unresolved checks</Text>
-          <BulletList items={displayUnknowns} empty="No unresolved checks in this evaluation." />
+          <Text style={styles.detailTitle}>Unresolved checks</Text>
+          <BulletList items={unresolved} empty="No unresolved checks in this evaluation." />
 
-          <Text style={styles.detailHeading}>Evidence</Text>
+          <Text style={styles.detailTitle}>Evidence</Text>
           <BulletList
             items={evaluation.evidenceSources.map((source) => `${source.title} · ${source.kind}`)}
             empty="No evidence source is attached."
@@ -365,16 +373,16 @@ export default function BuilderScreen() {
 
           <Pressable
             accessibilityRole="button"
-            disabled={isBlocked}
+            disabled={blocked}
             style={({ pressed }) => [
               styles.primaryButton,
-              pressed && styles.primaryButtonPressed,
-              isBlocked && styles.disabledButton,
+              pressed ? styles.primaryPressed : null,
+              blocked ? styles.disabled : null,
             ]}
-            onPress={() => addSelected(true)}
+            onPress={() => addToBuild(true)}
           >
             <Text style={styles.primaryButtonText}>
-              {isBlocked
+              {blocked
                 ? "Cannot add this component"
                 : requiredProducts.length > 0
                   ? "Add component + required parts"
@@ -384,11 +392,11 @@ export default function BuilderScreen() {
             </Text>
           </Pressable>
 
-          {requiredProducts.length > 0 && !isBlocked ? (
+          {requiredProducts.length > 0 && !blocked ? (
             <Pressable
               accessibilityRole="button"
-              style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
-              onPress={() => addSelected(false)}
+              style={({ pressed }) => [styles.secondaryButton, pressed ? styles.pressed : null]}
+              onPress={() => addToBuild(false)}
             >
               <Text style={styles.secondaryButtonText}>Add component only</Text>
             </Pressable>
@@ -405,7 +413,7 @@ export default function BuilderScreen() {
           {buildItems.length === 0 ? (
             <View style={styles.emptyBuild}>
               <Text style={styles.emptyBuildTitle}>No components added</Text>
-              <Text style={styles.bodyMuted}>
+              <Text style={styles.mutedBody}>
                 Review a compatibility result, then add the component to this build.
               </Text>
             </View>
@@ -415,15 +423,15 @@ export default function BuilderScreen() {
                 <View key={item.id} style={styles.buildItem}>
                   <View style={styles.buildItemCopy}>
                     <Text style={styles.buildItemTitle}>{item.exactModel}</Text>
-                    <Text style={styles.cardMeta}>{formatMoney(item.knownPriceCents)}</Text>
+                    <Text style={styles.meta}>{money(item.knownPriceCents)}</Text>
                   </View>
                   <Pressable
                     accessibilityRole="button"
                     accessibilityLabel={`Remove ${item.exactModel}`}
                     hitSlop={12}
-                    onPress={() => removeItem(item.id)}
+                    onPress={() => removeFromBuild(item.id)}
                   >
-                    <Text style={styles.removeButton}>Remove</Text>
+                    <Text style={styles.removeText}>Remove</Text>
                   </Pressable>
                 </View>
               ))}
@@ -431,24 +439,23 @@ export default function BuilderScreen() {
           )}
 
           <View style={styles.divider} />
-          <DataRow label="Known build price" value={formatMoney(totals.price)} />
+          <DataRow label="Known build price" value={money(totals.price)} />
           <DataRow
             label="Known configured weight"
             value={totals.weight === undefined ? "Unknown" : `${totals.weight} g`}
           />
-          <DataRow label="Unknown price items" value={`${totals.unknownPrices}`} />
-          <DataRow label="Unknown weight items" value={`${totals.unknownWeights}`} last />
+          <DataRow label="Unknown price items" value={String(totals.unknownPrices)} />
+          <DataRow label="Unknown weight items" value={String(totals.unknownWeights)} last />
 
           <Pressable
             accessibilityRole="button"
-            style={({ pressed }) => [styles.secondaryButton, pressed && styles.pressed]}
+            style={({ pressed }) => [styles.secondaryButton, pressed ? styles.pressed : null]}
             onPress={() => void saveBuild()}
           >
             <Text style={styles.secondaryButtonText}>Save on this iPhone</Text>
           </Pressable>
           <Text style={styles.storageNote}>
-            This Phase 1 save is local to the device. Account sync will be connected through
-            Supabase in the next phase.
+            This Phase 1 save stays on the device. Account sync is the next Supabase wiring step.
           </Text>
         </View>
 
@@ -459,11 +466,13 @@ export default function BuilderScreen() {
               {savedBuilds.map((build, index) => (
                 <View
                   key={build.id}
-                  style={[styles.savedRow, index === savedBuilds.length - 1 && styles.savedRowLast]}
+                  style={
+                    index === savedBuilds.length - 1 ? styles.savedRowLast : styles.savedRow
+                  }
                 >
-                  <View>
+                  <View style={styles.savedCopy}>
                     <Text style={styles.buildItemTitle}>{build.name}</Text>
-                    <Text style={styles.cardMeta}>
+                    <Text style={styles.meta}>
                       {build.componentIds.length} components · engine {build.engineVersion}
                     </Text>
                   </View>
@@ -488,19 +497,19 @@ export default function BuilderScreen() {
       <Modal
         animationType="slide"
         transparent
-        visible={pickerOpen}
-        onRequestClose={() => setPickerOpen(false)}
+        visible={pickerVisible}
+        onRequestClose={() => setPickerVisible(false)}
       >
-        <Pressable style={styles.modalBackdrop} onPress={() => setPickerOpen(false)}>
+        <Pressable style={styles.backdrop} onPress={() => setPickerVisible(false)}>
           <Pressable style={styles.sheet} onPress={(event) => event.stopPropagation()}>
-            <View style={styles.sheetHandle} />
+            <View style={styles.handle} />
             <View style={styles.sheetHeader}>
               <View>
                 <Text style={styles.sheetEyebrow}>SELECT COMPONENT</Text>
                 <Text style={styles.sheetTitle}>Accessories</Text>
               </View>
-              <Pressable hitSlop={12} onPress={() => setPickerOpen(false)}>
-                <Text style={styles.closeButton}>Done</Text>
+              <Pressable hitSlop={12} onPress={() => setPickerVisible(false)}>
+                <Text style={styles.doneText}>Done</Text>
               </Pressable>
             </View>
 
@@ -510,18 +519,18 @@ export default function BuilderScreen() {
                 <Pressable
                   key={product.id}
                   style={({ pressed }) => [
-                    styles.optionRow,
-                    selected && styles.optionRowSelected,
-                    pressed && styles.pressed,
+                    styles.option,
+                    selected ? styles.optionSelected : null,
+                    pressed ? styles.pressed : null,
                   ]}
-                  onPress={() => chooseAccessory(product.id)}
+                  onPress={() => selectAccessory(product.id)}
                 >
                   <View style={styles.optionCopy}>
                     <Text style={styles.optionManufacturer}>{product.manufacturer}</Text>
                     <Text style={styles.optionTitle}>{product.exactModel}</Text>
-                    <Text style={styles.cardMeta}>{product.category.replaceAll("_", " ")}</Text>
+                    <Text style={styles.meta}>{product.category.replaceAll("_", " ")}</Text>
                   </View>
-                  <View style={[styles.radio, selected && styles.radioSelected]}>
+                  <View style={selected ? styles.radioSelected : styles.radio}>
                     {selected ? <View style={styles.radioDot} /> : null}
                   </View>
                 </Pressable>
@@ -535,45 +544,45 @@ export default function BuilderScreen() {
 }
 
 const styles = StyleSheet.create({
-  safeArea: { flex: 1, backgroundColor: palette.background },
-  emptyScreen: { flex: 1, justifyContent: "center", padding: 24 },
-  emptyTitle: { color: palette.text, fontSize: 26, fontWeight: "800", marginBottom: 8 },
-  appHeader: {
+  safeArea: { flex: 1, backgroundColor: colors.bg },
+  centered: { flex: 1, justifyContent: "center", padding: 24 },
+  emptyTitle: { color: colors.text, fontSize: 26, fontWeight: "800", marginBottom: 8 },
+  header: {
     height: 54,
     paddingHorizontal: 20,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: palette.border,
-    backgroundColor: palette.background,
+    borderBottomColor: colors.border,
+    backgroundColor: colors.bg,
   },
-  wordmark: { color: palette.text, fontSize: 15, fontWeight: "900", letterSpacing: 2.4 },
-  demoPill: {
+  wordmark: { color: colors.text, fontSize: 15, fontWeight: "900", letterSpacing: 2.4 },
+  demoBadge: {
     minHeight: 26,
     paddingHorizontal: 10,
     borderRadius: 999,
     justifyContent: "center",
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
   },
-  demoPillText: { color: palette.secondary, fontSize: 10, fontWeight: "800", letterSpacing: 0.7 },
+  demoBadgeText: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 0.7 },
   scroll: { flex: 1 },
-  scrollContent: { paddingHorizontal: 18, paddingBottom: 48 },
+  content: { paddingHorizontal: 18, paddingBottom: 48 },
   hero: { paddingTop: 34, paddingBottom: 34 },
-  eyebrow: { color: palette.secondary, fontSize: 11, fontWeight: "800", letterSpacing: 1.5 },
+  eyebrow: { color: colors.muted, fontSize: 11, fontWeight: "800", letterSpacing: 1.5 },
   title: {
-    color: palette.text,
+    color: colors.text,
     fontSize: 42,
     lineHeight: 43,
     fontWeight: "800",
     letterSpacing: -1.5,
     marginTop: 10,
   },
-  subtitle: { color: palette.secondary, fontSize: 16, lineHeight: 24, marginTop: 16 },
+  subtitle: { color: colors.muted, fontSize: 16, lineHeight: 24, marginTop: 16 },
   sectionLabel: {
-    color: palette.secondary,
+    color: colors.muted,
     fontSize: 11,
     fontWeight: "800",
     letterSpacing: 1.25,
@@ -582,10 +591,10 @@ const styles = StyleSheet.create({
     marginLeft: 3,
   },
   card: {
-    backgroundColor: palette.surface,
+    backgroundColor: colors.surface,
     borderRadius: 20,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.border,
+    borderColor: colors.border,
     padding: 18,
     marginBottom: 24,
     shadowColor: "#000000",
@@ -593,10 +602,10 @@ const styles = StyleSheet.create({
     shadowRadius: 16,
     shadowOffset: { width: 0, height: 8 },
   },
-  cardKicker: { color: palette.secondary, fontSize: 13, marginBottom: 5 },
-  cardTitle: { color: palette.text, fontSize: 18, lineHeight: 23, fontWeight: "750" },
-  cardMeta: { color: palette.tertiary, fontSize: 12, lineHeight: 17, marginTop: 4 },
-  divider: { height: StyleSheet.hairlineWidth, backgroundColor: palette.border, marginVertical: 16 },
+  kicker: { color: colors.muted, fontSize: 13, marginBottom: 5 },
+  cardTitle: { color: colors.text, fontSize: 18, lineHeight: 23, fontWeight: "700" },
+  meta: { color: colors.faint, fontSize: 12, lineHeight: 17, marginTop: 4 },
+  divider: { height: StyleSheet.hairlineWidth, backgroundColor: colors.border, marginVertical: 16 },
   dataRow: {
     minHeight: 46,
     flexDirection: "row",
@@ -604,49 +613,55 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: palette.border,
+    borderBottomColor: colors.border,
   },
-  dataRowLast: { borderBottomWidth: 0 },
-  dataLabel: { color: palette.secondary, fontSize: 14 },
-  dataValue: { color: palette.text, fontSize: 14, fontWeight: "700", textAlign: "right", flexShrink: 1 },
+  dataRowLast: {
+    minHeight: 46,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  dataLabel: { color: colors.muted, fontSize: 14 },
+  dataValue: { color: colors.text, fontSize: 14, fontWeight: "700", textAlign: "right", flexShrink: 1 },
   selectionCard: {
     minHeight: 96,
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: palette.surface,
+    backgroundColor: colors.surface,
     borderRadius: 18,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.border,
+    borderColor: colors.border,
     padding: 17,
   },
   selectionCopy: { flex: 1, paddingRight: 12 },
-  selectionTitle: { color: palette.text, fontSize: 16, lineHeight: 21, fontWeight: "700" },
-  chevron: { color: palette.tertiary, fontSize: 34, fontWeight: "300" },
+  selectionTitle: { color: colors.text, fontSize: 16, lineHeight: 21, fontWeight: "700" },
+  chevron: { color: colors.faint, fontSize: 34, fontWeight: "300" },
   pressed: { opacity: 0.68 },
-  compactStats: { marginBottom: 24, paddingHorizontal: 4 },
-  statusHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  statusPill: { minHeight: 30, borderRadius: 999, paddingHorizontal: 10, justifyContent: "center", flexShrink: 1 },
-  statusText: { fontSize: 10, fontWeight: "850", letterSpacing: 0.45 },
-  confidence: { color: palette.text, fontSize: 15, fontWeight: "800" },
-  resultSummary: { color: palette.text, fontSize: 18, lineHeight: 26, fontWeight: "650", marginTop: 20 },
-  confidenceExplanation: { color: palette.secondary, fontSize: 13, lineHeight: 19, marginTop: 10 },
-  detailHeading: { color: palette.text, fontSize: 13, fontWeight: "800", marginTop: 20, marginBottom: 8 },
-  bodyMuted: { color: palette.secondary, fontSize: 14, lineHeight: 21 },
+  inlineStats: { marginBottom: 24, paddingHorizontal: 4 },
+  statusRow: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
+  statusBadge: { minHeight: 30, borderRadius: 999, paddingHorizontal: 10, justifyContent: "center", flexShrink: 1 },
+  statusBadgeText: { fontSize: 10, fontWeight: "800", letterSpacing: 0.45 },
+  confidence: { color: colors.text, fontSize: 15, fontWeight: "800" },
+  summary: { color: colors.text, fontSize: 18, lineHeight: 26, fontWeight: "600", marginTop: 20 },
+  explanation: { color: colors.muted, fontSize: 13, lineHeight: 19, marginTop: 10 },
+  detailTitle: { color: colors.text, fontSize: 13, fontWeight: "800", marginTop: 20, marginBottom: 8 },
+  mutedBody: { color: colors.muted, fontSize: 14, lineHeight: 21 },
   bulletList: { gap: 8 },
   bulletRow: { flexDirection: "row", alignItems: "flex-start", gap: 10 },
-  bullet: { width: 5, height: 5, borderRadius: 99, backgroundColor: palette.tertiary, marginTop: 8 },
-  bulletText: { color: palette.secondary, fontSize: 14, lineHeight: 21, flex: 1 },
+  bullet: { width: 5, height: 5, borderRadius: 99, backgroundColor: colors.faint, marginTop: 8 },
+  bulletText: { color: colors.muted, fontSize: 14, lineHeight: 21, flex: 1 },
   primaryButton: {
     minHeight: 54,
     borderRadius: 15,
     alignItems: "center",
     justifyContent: "center",
     paddingHorizontal: 16,
-    backgroundColor: palette.dark,
+    backgroundColor: colors.dark,
     marginTop: 24,
   },
-  primaryButtonPressed: { transform: [{ scale: 0.985 }], opacity: 0.9 },
-  disabledButton: { opacity: 0.38 },
+  primaryPressed: { transform: [{ scale: 0.985 }], opacity: 0.9 },
+  disabled: { opacity: 0.38 },
   primaryButtonText: { color: "#FFFFFF", fontSize: 15, fontWeight: "800" },
   secondaryButton: {
     minHeight: 52,
@@ -655,15 +670,15 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     paddingHorizontal: 16,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     marginTop: 10,
   },
-  secondaryButtonText: { color: palette.text, fontSize: 15, fontWeight: "750" },
+  secondaryButtonText: { color: colors.text, fontSize: 15, fontWeight: "700" },
   buildHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 12 },
-  componentCount: { color: palette.secondary, fontSize: 13 },
+  componentCount: { color: colors.muted, fontSize: 13 },
   emptyBuild: { paddingVertical: 24 },
-  emptyBuildTitle: { color: palette.text, fontSize: 15, fontWeight: "700", marginBottom: 6 },
+  emptyBuildTitle: { color: colors.text, fontSize: 15, fontWeight: "700", marginBottom: 6 },
   buildList: { marginTop: 18 },
   buildItem: {
     minHeight: 66,
@@ -672,12 +687,12 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 14,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: palette.border,
+    borderBottomColor: colors.border,
   },
   buildItemCopy: { flex: 1, paddingVertical: 10 },
-  buildItemTitle: { color: palette.text, fontSize: 14, lineHeight: 19, fontWeight: "700" },
-  removeButton: { color: palette.red, fontSize: 13, fontWeight: "700" },
-  storageNote: { color: palette.tertiary, fontSize: 11, lineHeight: 17, marginTop: 12 },
+  buildItemTitle: { color: colors.text, fontSize: 14, lineHeight: 19, fontWeight: "700" },
+  removeText: { color: colors.red, fontSize: 13, fontWeight: "700" },
+  storageNote: { color: colors.faint, fontSize: 11, lineHeight: 17, marginTop: 12 },
   savedRow: {
     minHeight: 62,
     flexDirection: "row",
@@ -685,31 +700,33 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     gap: 16,
     borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: palette.border,
+    borderBottomColor: colors.border,
   },
-  savedRowLast: { borderBottomWidth: 0 },
-  savedDate: { color: palette.secondary, fontSize: 12, fontWeight: "650" },
-  disclaimer: { color: palette.tertiary, fontSize: 11, lineHeight: 17, textAlign: "center", paddingHorizontal: 12 },
-  modalBackdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.28)" },
+  savedRowLast: {
+    minHeight: 62,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: 16,
+  },
+  savedCopy: { flex: 1 },
+  savedDate: { color: colors.muted, fontSize: 12, fontWeight: "600" },
+  disclaimer: { color: colors.faint, fontSize: 11, lineHeight: 17, textAlign: "center", paddingHorizontal: 12 },
+  backdrop: { flex: 1, justifyContent: "flex-end", backgroundColor: "rgba(0,0,0,0.28)" },
   sheet: {
-    backgroundColor: palette.background,
+    backgroundColor: colors.bg,
     borderTopLeftRadius: 26,
     borderTopRightRadius: 26,
     paddingHorizontal: 18,
     paddingTop: 10,
     paddingBottom: 34,
   },
-  sheetHandle: { width: 38, height: 5, borderRadius: 99, backgroundColor: "#C7C7C2", alignSelf: "center" },
-  sheetHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingVertical: 20,
-  },
-  sheetEyebrow: { color: palette.secondary, fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
-  sheetTitle: { color: palette.text, fontSize: 28, fontWeight: "800", letterSpacing: -0.6, marginTop: 4 },
-  closeButton: { color: palette.text, fontSize: 15, fontWeight: "750" },
-  optionRow: {
+  handle: { width: 38, height: 5, borderRadius: 99, backgroundColor: "#C7C7C2", alignSelf: "center" },
+  sheetHeader: { flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 20 },
+  sheetEyebrow: { color: colors.muted, fontSize: 10, fontWeight: "800", letterSpacing: 1.2 },
+  sheetTitle: { color: colors.text, fontSize: 28, fontWeight: "800", letterSpacing: -0.6, marginTop: 4 },
+  doneText: { color: colors.text, fontSize: 15, fontWeight: "700" },
+  option: {
     minHeight: 92,
     flexDirection: "row",
     alignItems: "center",
@@ -717,15 +734,15 @@ const styles = StyleSheet.create({
     padding: 15,
     borderRadius: 17,
     borderWidth: StyleSheet.hairlineWidth,
-    borderColor: palette.border,
-    backgroundColor: palette.surface,
+    borderColor: colors.border,
+    backgroundColor: colors.surface,
     marginBottom: 10,
   },
-  optionRowSelected: { borderColor: palette.dark, borderWidth: 1.2 },
+  optionSelected: { borderColor: colors.dark, borderWidth: 1.2 },
   optionCopy: { flex: 1 },
-  optionManufacturer: { color: palette.secondary, fontSize: 12, marginBottom: 3 },
-  optionTitle: { color: palette.text, fontSize: 15, lineHeight: 20, fontWeight: "700" },
-  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: palette.border, alignItems: "center", justifyContent: "center" },
-  radioSelected: { borderColor: palette.dark },
-  radioDot: { width: 11, height: 11, borderRadius: 99, backgroundColor: palette.dark },
+  optionManufacturer: { color: colors.muted, fontSize: 12, marginBottom: 3 },
+  optionTitle: { color: colors.text, fontSize: 15, lineHeight: 20, fontWeight: "700" },
+  radio: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: colors.border, alignItems: "center", justifyContent: "center" },
+  radioSelected: { width: 22, height: 22, borderRadius: 11, borderWidth: 1.5, borderColor: colors.dark, alignItems: "center", justifyContent: "center" },
+  radioDot: { width: 11, height: 11, borderRadius: 99, backgroundColor: colors.dark },
 });
