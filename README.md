@@ -104,7 +104,7 @@ This requires macOS with Xcode and an iOS Simulator installed.
 
 ```bash
 pnpm test:engine
-pnpm --filter @fitment/mobile doctor
+pnpm --filter @fitment/mobile run doctor
 pnpm --filter @fitment/mobile typecheck
 pnpm export:ios
 ```
