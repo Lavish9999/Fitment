@@ -1,6 +1,7 @@
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { Tabs } from "expo-router";
+import { StyleSheet, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { colors, fontFamily, tabBarBottom, tabBarMetrics } from "../../src/theme";
@@ -28,44 +29,48 @@ export default function TabLayout() {
         tabBarHideOnKeyboard: true,
         tabBarShowLabel: true,
         tabBarActiveTintColor: colors.white,
-        tabBarInactiveTintColor: "#8F8E86",
+        tabBarInactiveTintColor: "#898880",
         tabBarLabelStyle: {
           fontFamily,
-          fontSize: 10,
-          lineHeight: 12,
+          fontSize: 9.5,
+          lineHeight: 11,
           fontWeight: "600",
-          marginTop: 1,
+          marginTop: 0,
         },
-        tabBarIconStyle: {
-          marginTop: 1,
-        },
+        tabBarIconStyle: { marginTop: 0 },
         tabBarItemStyle: {
           height: tabBarMetrics.height,
-          paddingTop: 7,
-          paddingBottom: 7,
+          paddingTop: 4,
+          paddingBottom: 5,
         },
         tabBarStyle: {
           position: "absolute",
-          left: 20,
-          right: 20,
+          left: tabBarMetrics.horizontalInset,
+          right: tabBarMetrics.horizontalInset,
           bottom: tabBarBottom(insets.bottom),
           height: tabBarMetrics.height,
-          paddingHorizontal: 8,
+          paddingHorizontal: 6,
           paddingTop: 0,
           paddingBottom: 0,
           borderRadius: tabBarMetrics.height / 2,
           borderTopWidth: 0,
+          borderWidth: StyleSheet.hairlineWidth,
+          borderColor: "rgba(255,255,255,0.08)",
           backgroundColor: colors.nav,
           shadowColor: "#000000",
-          shadowOpacity: 0.16,
-          shadowRadius: 14,
-          shadowOffset: { width: 0, height: 6 },
-          elevation: 8,
+          shadowOpacity: 0.18,
+          shadowRadius: 16,
+          shadowOffset: { width: 0, height: 8 },
+          elevation: 10,
         },
         tabBarIcon: ({ focused, color }) => {
           const key = route.name as keyof typeof icons;
           const pair = icons[key] ?? icons.explore;
-          return <Ionicons name={focused ? pair[1] : pair[0]} size={20} color={color} />;
+          return (
+            <View style={[styles.iconShell, focused ? styles.iconShellActive : null]}>
+              <Ionicons name={focused ? pair[1] : pair[0]} size={18} color={color} />
+            </View>
+          );
         },
       })}
     >
@@ -76,3 +81,16 @@ export default function TabLayout() {
     </Tabs>
   );
 }
+
+const styles = StyleSheet.create({
+  iconShell: {
+    width: 27,
+    height: 27,
+    borderRadius: 14,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  iconShellActive: {
+    backgroundColor: "rgba(255,255,255,0.10)",
+  },
+});
