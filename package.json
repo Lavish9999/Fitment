@@ -1,0 +1,23 @@
+{
+  "name": "fitment",
+  "version": "0.1.0",
+  "private": true,
+  "packageManager": "pnpm@10.13.1",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "dev": "turbo dev",
+    "build": "turbo build",
+    "lint": "turbo lint",
+    "typecheck": "turbo typecheck",
+    "test": "pnpm test:engine",
+    "test:engine": "rm -rf .test-dist && tsc -p tsconfig.engine.json && node --test tests/*.test.mjs",
+    "check": "pnpm test:engine"
+  },
+  "devDependencies": {
+    "turbo": "^2.5.4",
+    "typescript": "^5.8.3"
+  },
+  "type": "module"
+}

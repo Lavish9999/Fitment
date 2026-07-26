@@ -1,0 +1,20 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "NodeNext",
+    "moduleResolution": "NodeNext",
+    "strict": true,
+    "noUncheckedIndexedAccess": true,
+    "exactOptionalPropertyTypes": true,
+    "forceConsistentCasingInFileNames": true,
+    "skipLibCheck": true,
+    "rootDir": ".",
+    "outDir": ".test-dist",
+    "declaration": true
+  },
+  "include": [
+    "packages/domain/src/**/*.ts",
+    "packages/compatibility-engine/src/**/*.ts",
+    "packages/catalog/src/**/*.ts"
+  ]
+}
