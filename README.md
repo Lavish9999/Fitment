@@ -21,6 +21,24 @@ FITMENT is an iOS-first mobile application for evidence-driven firearm accessory
 - on-device build snapshots through AsyncStorage;
 - Supabase schema for future authenticated builds, RLS-protected Armory records, encrypted sensitive fields, and sanitized public sharing.
 
+## Project folder
+
+The Git repository root is the folder named `Fitment`. The iPhone application itself is inside:
+
+```text
+Fitment/apps/mobile
+```
+
+On Windows, the full path depends on where the repository was cloned. Examples:
+
+```text
+C:\Users\YOUR-NAME\Fitment\apps\mobile
+C:\Users\YOUR-NAME\Desktop\Fitment\apps\mobile
+C:\Users\YOUR-NAME\Downloads\Fitment\apps\mobile
+```
+
+You normally run commands from the root `Fitment` folder, not from `apps/mobile`.
+
 ## Workspace
 
 ```text
@@ -41,26 +59,36 @@ tests/
 
 - Node.js 22.13+
 - pnpm 10+
-- Expo Go on an iPhone for the fastest device test
-- Xcode on macOS for the iOS Simulator or native development build
+- Expo Go from the iOS App Store
+- iPhone and computer connected to the same Wi-Fi network
 - Supabase CLI only when testing database migrations
 
 ## Install
 
-```bash
+Open PowerShell in the root `Fitment` folder and run:
+
+```powershell
 corepack enable
 pnpm install
 ```
 
 ## Run on an iPhone with Expo Go
 
-```bash
+From the root `Fitment` folder:
+
+```powershell
 pnpm mobile
 ```
 
-Scan the QR code with the iPhone Camera app and open it in Expo Go. The phone and computer should be on the same network. If LAN discovery is blocked, run:
+Then:
 
-```bash
+1. Open Expo Go on the iPhone.
+2. Scan the QR code shown in PowerShell.
+3. Allow the project to open in Expo Go.
+
+If the phone cannot find the computer over the local network, stop the server with `Ctrl+C` and run:
+
+```powershell
 pnpm --filter @fitment/mobile start --tunnel
 ```
 
@@ -76,6 +104,7 @@ This requires macOS with Xcode and an iOS Simulator installed.
 
 ```bash
 pnpm test:engine
+pnpm --filter @fitment/mobile run doctor
 pnpm --filter @fitment/mobile typecheck
 pnpm export:ios
 ```
