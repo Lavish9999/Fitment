@@ -3,7 +3,7 @@ import * as Haptics from "expo-haptics";
 import { Tabs } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, fontFamily, tabBarMetrics } from "../../src/theme";
+import { colors, fontFamily, tabBarBottom, tabBarMetrics } from "../../src/theme";
 
 const icons = {
   explore: ["compass-outline", "compass"] as const,
@@ -32,18 +32,27 @@ export default function TabLayout() {
         tabBarLabelStyle: {
           fontFamily,
           fontSize: 10,
+          lineHeight: 12,
           fontWeight: "600",
+          marginTop: 1,
+        },
+        tabBarIconStyle: {
+          marginTop: 1,
         },
         tabBarItemStyle: {
-          paddingVertical: 4,
+          height: tabBarMetrics.height,
+          paddingTop: 7,
+          paddingBottom: 7,
         },
         tabBarStyle: {
           position: "absolute",
           left: 20,
           right: 20,
-          bottom: Math.max(insets.bottom - 2, tabBarMetrics.bottomOffset),
+          bottom: tabBarBottom(insets.bottom),
           height: tabBarMetrics.height,
           paddingHorizontal: 8,
+          paddingTop: 0,
+          paddingBottom: 0,
           borderRadius: tabBarMetrics.height / 2,
           borderTopWidth: 0,
           backgroundColor: colors.nav,
