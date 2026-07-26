@@ -1,3 +1,3 @@
 /// <reference types="expo/types" />
 
-// Generated-style Expo type reference. Keep this file committed for editor support.
+// NOTE: This file should not be edited and should be in your git ignore

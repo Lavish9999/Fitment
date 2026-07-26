@@ -18,6 +18,7 @@ export default function RootLayout() {
           }}
         >
           <Stack.Screen name="(tabs)" />
+          <Stack.Screen name="select-firearm" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
           <Stack.Screen name="select-component" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
           <Stack.Screen name="compatibility-details" options={{ presentation: "modal", animation: "slide_from_bottom" }} />
         </Stack>

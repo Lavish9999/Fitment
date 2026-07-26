@@ -1,4 +1,5 @@
 import { Ionicons } from "@expo/vector-icons";
+import { useRouter } from "expo-router";
 import type { ReactNode } from "react";
 import {
   Pressable,
@@ -9,16 +10,20 @@ import {
   type StyleProp,
   type ViewStyle,
 } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { SafeAreaView, useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { colors, fontFamily, radius, shadow, spacing } from "../theme";
+import { colors, fontFamily, radius, shadow, spacing, tabBarMetrics } from "../theme";
 
 export function Screen({ children }: { children: ReactNode }) {
+  const insets = useSafeAreaInsets();
+  const bottomPadding =
+    insets.bottom + tabBarMetrics.height + tabBarMetrics.bottomOffset + tabBarMetrics.clearance;
+
   return (
     <SafeAreaView style={styles.safeArea} edges={["top", "left", "right"]}>
       <ScrollView
         style={styles.scroll}
-        contentContainerStyle={styles.content}
+        contentContainerStyle={[styles.content, { paddingBottom: bottomPadding }]}
         showsVerticalScrollIndicator={false}
       >
         {children}
@@ -30,15 +35,53 @@ export function Screen({ children }: { children: ReactNode }) {
 export function AppHeader({ title, subtitle }: { title: string; subtitle?: string }) {
   return (
     <View style={styles.header}>
-      <View style={styles.headerCopy}>
-        <Text style={styles.wordmark}>FITMENT</Text>
-        <Text style={styles.screenTitle}>{title}</Text>
-        {subtitle ? <Text style={styles.screenSubtitle}>{subtitle}</Text> : null}
-      </View>
-      <View style={styles.demoPill}>
-        <Text style={styles.demoPillText}>DEMO</Text>
-      </View>
+      <Text style={styles.screenTitle}>{title}</Text>
+      {subtitle ? <Text style={styles.screenSubtitle}>{subtitle}</Text> : null}
     </View>
+  );
+}
+
+export function DemoBanner() {
+  return (
+    <View style={styles.demoBanner}>
+      <Ionicons name="flask-outline" size={13} color={colors.inkFaint} />
+      <Text style={styles.demoBannerText}>Demo catalog — unverified demonstration data</Text>
+    </View>
+  );
+}
+
+export function ModalScreen({
+  title,
+  children,
+  scroll = true,
+}: {
+  title: string;
+  children: ReactNode;
+  scroll?: boolean;
+}) {
+  const router = useRouter();
+  return (
+    <SafeAreaView style={styles.safeArea} edges={["top", "left", "right", "bottom"]}>
+      <View style={styles.modalHeader}>
+        <Text style={styles.modalTitle}>{title}</Text>
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel="Close"
+          hitSlop={8}
+          onPress={() => router.back()}
+          style={({ pressed }) => [styles.modalClose, pressed ? styles.pressed : null]}
+        >
+          <Ionicons name="close" size={20} color={colors.ink} />
+        </Pressable>
+      </View>
+      {scroll ? (
+        <ScrollView contentContainerStyle={styles.modalContent} showsVerticalScrollIndicator={false}>
+          {children}
+        </ScrollView>
+      ) : (
+        <View style={styles.modalBody}>{children}</View>
+      )}
+    </SafeAreaView>
   );
 }
 
@@ -98,7 +141,7 @@ export function PrimaryButton({
 }: {
   label: string;
   onPress: () => void;
-  icon?: keyof typeof Ionicons.glyphMap;
+  icon?: keyof typeof Ionicons.glyphMap | undefined;
   disabled?: boolean;
 }) {
   return (
@@ -112,7 +155,7 @@ export function PrimaryButton({
         disabled ? styles.buttonDisabled : null,
       ]}
     >
-      {icon ? <Ionicons name={icon} size={18} color={colors.white} /> : null}
+      {icon ? <Ionicons name={icon} size={17} color={colors.white} /> : null}
       <Text style={styles.primaryButtonText}>{label}</Text>
     </Pressable>
   );
@@ -133,46 +176,59 @@ export function SecondaryButton({
       onPress={onPress}
       style={({ pressed }) => [styles.secondaryButton, pressed ? styles.buttonPressed : null]}
     >
-      {icon ? <Ionicons name={icon} size={18} color={colors.ink} /> : null}
+      {icon ? <Ionicons name={icon} size={17} color={colors.ink} /> : null}
       <Text style={styles.secondaryButtonText}>{label}</Text>
     </Pressable>
   );
 }
 
-export function ChevronRow({
+export function SelectorRow({
   eyebrow,
   title,
   detail,
+  icon,
   onPress,
 }: {
   eyebrow: string;
   title: string;
   detail?: string;
+  icon?: keyof typeof Ionicons.glyphMap;
   onPress: () => void;
 }) {
   return (
     <Pressable
       accessibilityRole="button"
       onPress={onPress}
-      style={({ pressed }) => [styles.chevronRow, pressed ? styles.rowPressed : null]}
+      style={({ pressed }) => [styles.selectorRow, pressed ? styles.rowPressed : null]}
     >
-      <View style={styles.chevronCopy}>
+      {icon ? (
+        <View style={styles.selectorIcon}>
+          <Ionicons name={icon} size={19} color={colors.ink} />
+        </View>
+      ) : null}
+      <View style={styles.selectorCopy}>
         <Text style={styles.rowEyebrow}>{eyebrow}</Text>
-        <Text style={styles.rowTitle} numberOfLines={2}>{title}</Text>
-        {detail ? <Text style={styles.rowDetail} numberOfLines={1}>{detail}</Text> : null}
+        <Text style={styles.rowTitle}>{title}</Text>
+        {detail ? <Text style={styles.rowDetail}>{detail}</Text> : null}
       </View>
-      <View style={styles.chevronCircle}>
-        <Ionicons name="chevron-forward" size={17} color={colors.inkSoft} />
-      </View>
+      <Ionicons name="chevron-forward" size={17} color={colors.inkFaint} />
     </Pressable>
   );
 }
 
-export function EmptyState({ icon, title, body }: { icon: keyof typeof Ionicons.glyphMap; title: string; body: string }) {
+export function EmptyState({
+  icon,
+  title,
+  body,
+}: {
+  icon: keyof typeof Ionicons.glyphMap;
+  title: string;
+  body: string;
+}) {
   return (
     <View style={styles.emptyState}>
       <View style={styles.emptyIcon}>
-        <Ionicons name={icon} size={22} color={colors.inkSoft} />
+        <Ionicons name={icon} size={20} color={colors.inkSoft} />
       </View>
       <Text style={styles.emptyTitle}>{title}</Text>
       <Text style={styles.emptyBody}>{body}</Text>
@@ -183,67 +239,71 @@ export function EmptyState({ icon, title, body }: { icon: keyof typeof Ionicons.
 const styles = StyleSheet.create({
   safeArea: { flex: 1, backgroundColor: colors.background },
   scroll: { flex: 1 },
-  content: { paddingHorizontal: spacing.md, paddingBottom: 122 },
-  header: {
-    flexDirection: "row",
-    alignItems: "flex-start",
-    justifyContent: "space-between",
-    gap: spacing.md,
-    paddingTop: spacing.sm,
-    paddingBottom: spacing.xl,
-  },
-  headerCopy: { flex: 1 },
-  wordmark: {
-    color: colors.inkFaint,
-    fontFamily,
-    fontSize: 11,
-    fontWeight: "700",
-    letterSpacing: 2.1,
-    marginBottom: spacing.sm,
-  },
+  content: { paddingHorizontal: spacing.md },
+  header: { paddingTop: spacing.xs, paddingBottom: spacing.md },
   screenTitle: {
     color: colors.ink,
     fontFamily,
-    fontSize: 32,
-    lineHeight: 37,
-    fontWeight: "700",
-    letterSpacing: -0.8,
+    fontSize: 30,
+    lineHeight: 35,
+    fontWeight: "600",
+    letterSpacing: -0.6,
   },
   screenSubtitle: {
     color: colors.inkSoft,
     fontFamily,
-    fontSize: 15,
-    lineHeight: 21,
-    marginTop: spacing.xs,
+    fontSize: 14,
+    lineHeight: 19,
+    marginTop: spacing.xxs,
   },
-  demoPill: {
-    minHeight: 30,
-    paddingHorizontal: 12,
-    borderRadius: radius.pill,
+  demoBanner: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 6,
+    marginBottom: spacing.sm,
+  },
+  demoBannerText: { color: colors.inkFaint, fontFamily, fontSize: 12, fontWeight: "500" },
+  modalHeader: {
+    minHeight: 60,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
+    gap: spacing.md,
+    paddingHorizontal: spacing.md,
+    borderBottomWidth: StyleSheet.hairlineWidth,
+    borderBottomColor: colors.line,
+  },
+  modalTitle: {
+    flex: 1,
+    color: colors.ink,
+    fontFamily,
+    fontSize: 20,
+    fontWeight: "600",
+    letterSpacing: -0.3,
+  },
+  modalClose: {
+    width: 34,
+    height: 34,
+    borderRadius: 17,
+    alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceMuted,
-    marginTop: 2,
   },
-  demoPillText: {
-    color: colors.inkSoft,
-    fontFamily,
-    fontSize: 10,
-    fontWeight: "700",
-    letterSpacing: 0.9,
-  },
+  modalContent: { padding: spacing.md, paddingBottom: spacing.xxl },
+  modalBody: { flex: 1 },
   sectionHeader: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
     gap: spacing.md,
     marginTop: spacing.lg,
-    marginBottom: spacing.sm,
+    marginBottom: spacing.xs,
   },
   sectionTitle: {
     color: colors.ink,
     fontFamily,
-    fontSize: 17,
-    fontWeight: "700",
+    fontSize: 18,
+    fontWeight: "600",
     letterSpacing: -0.2,
   },
   card: {
@@ -255,15 +315,16 @@ const styles = StyleSheet.create({
     ...shadow,
   },
   badge: {
-    minHeight: 28,
-    maxWidth: "78%",
+    minHeight: 26,
     borderRadius: radius.pill,
     justifyContent: "center",
     paddingHorizontal: 10,
+    alignSelf: "flex-start",
+    maxWidth: "100%",
   },
-  badgeText: { fontFamily, fontSize: 11, fontWeight: "700" },
+  badgeText: { fontFamily, fontSize: 12, fontWeight: "600" },
   metricRow: {
-    minHeight: 45,
+    minHeight: 44,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -282,72 +343,74 @@ const styles = StyleSheet.create({
     flexShrink: 1,
   },
   primaryButton: {
-    minHeight: 52,
-    borderRadius: radius.md,
+    minHeight: 48,
+    borderRadius: radius.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
     backgroundColor: colors.ink,
     paddingHorizontal: spacing.md,
   },
-  primaryButtonText: { color: colors.white, fontFamily, fontSize: 15, fontWeight: "700" },
+  primaryButtonText: { color: colors.white, fontFamily, fontSize: 15, fontWeight: "600" },
   secondaryButton: {
-    minHeight: 50,
-    borderRadius: radius.md,
+    minHeight: 46,
+    borderRadius: radius.sm,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "center",
-    gap: spacing.sm,
+    gap: spacing.xs,
     backgroundColor: colors.surface,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.line,
     paddingHorizontal: spacing.md,
   },
   secondaryButtonText: { color: colors.ink, fontFamily, fontSize: 15, fontWeight: "600" },
-  buttonPressed: { transform: [{ scale: 0.985 }], opacity: 0.86 },
+  buttonPressed: { transform: [{ scale: 0.985 }], opacity: 0.85 },
   buttonDisabled: { opacity: 0.36 },
-  chevronRow: {
-    minHeight: 92,
+  pressed: { opacity: 0.65 },
+  selectorRow: {
+    minHeight: 72,
     flexDirection: "row",
     alignItems: "center",
-    gap: spacing.md,
+    gap: spacing.sm,
     backgroundColor: colors.surface,
-    borderRadius: radius.lg,
+    borderRadius: radius.md,
     borderWidth: StyleSheet.hairlineWidth,
     borderColor: colors.line,
-    padding: spacing.md,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
   },
   rowPressed: { opacity: 0.68 },
-  chevronCopy: { flex: 1 },
-  rowEyebrow: { color: colors.inkFaint, fontFamily, fontSize: 12, marginBottom: 4 },
-  rowTitle: { color: colors.ink, fontFamily, fontSize: 16, lineHeight: 21, fontWeight: "600" },
-  rowDetail: { color: colors.inkSoft, fontFamily, fontSize: 12, marginTop: 5 },
-  chevronCircle: {
-    width: 34,
-    height: 34,
-    borderRadius: 17,
+  selectorIcon: {
+    width: 38,
+    height: 38,
+    borderRadius: 12,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceMuted,
   },
+  selectorCopy: { flex: 1 },
+  rowEyebrow: { color: colors.inkFaint, fontFamily, fontSize: 12, marginBottom: 2 },
+  rowTitle: { color: colors.ink, fontFamily, fontSize: 16, lineHeight: 21, fontWeight: "600" },
+  rowDetail: { color: colors.inkSoft, fontFamily, fontSize: 13, marginTop: 3 },
   emptyState: { alignItems: "center", paddingVertical: spacing.xl, paddingHorizontal: spacing.md },
   emptyIcon: {
-    width: 46,
-    height: 46,
-    borderRadius: 23,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     alignItems: "center",
     justifyContent: "center",
     backgroundColor: colors.surfaceMuted,
-    marginBottom: spacing.md,
+    marginBottom: spacing.sm,
   },
-  emptyTitle: { color: colors.ink, fontFamily, fontSize: 16, fontWeight: "600" },
+  emptyTitle: { color: colors.ink, fontFamily, fontSize: 15, fontWeight: "600" },
   emptyBody: {
     color: colors.inkSoft,
     fontFamily,
-    fontSize: 14,
-    lineHeight: 20,
+    fontSize: 13,
+    lineHeight: 18,
     textAlign: "center",
-    marginTop: spacing.xs,
+    marginTop: spacing.xxs,
   },
 });

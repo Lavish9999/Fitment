@@ -11,11 +11,23 @@ import {
   demoProductsById,
 } from "@fitment/catalog";
 import { evaluateCompatibility } from "@fitment/compatibility-engine";
-import type { CatalogVariant, CompatibilityEvaluation } from "@fitment/domain";
+import type { CatalogVariant, CompatibilityEvaluation, DimensionCheck } from "@fitment/domain";
 
-const ENGINE_VERSION = "0.2.0-demo";
+export const ENGINE_VERSION = "0.2.0-demo";
 const CURRENT_BUILD_KEY = "fitment.mobile.current-build.v2";
 const SAVED_BUILDS_KEY = "fitment.mobile.saved-builds.v2";
+
+const demoDimensionChecks: DimensionCheck[] = [
+  {
+    code: "CONTROL_CLEARANCE",
+    label: "Control clearance",
+    result: "UNKNOWN",
+    critical: false,
+    explanation:
+      "Control clearance has not been physically verified for this demonstration combination.",
+    evidenceSourceIds: [],
+  },
+];
 
 export interface SavedBuild {
   id: string;
@@ -23,6 +35,7 @@ export interface SavedBuild {
   componentIds: string[];
   engineVersion: string;
   savedAt: string;
+  updatedAt: string;
 }
 
 interface BuildTotals {
@@ -35,6 +48,7 @@ interface BuildTotals {
 interface FitmentContextValue {
   selectedAccessory: CatalogVariant;
   evaluation: CompatibilityEvaluation;
+  evaluations: ReadonlyMap<string, CompatibilityEvaluation>;
   requiredProducts: CatalogVariant[];
   buildItems: CatalogVariant[];
   savedBuilds: SavedBuild[];
@@ -44,7 +58,11 @@ interface FitmentContextValue {
   addSelected: (includeRequired: boolean) => void;
   removeFromBuild: (id: string) => void;
   clearBuild: () => void;
-  saveCurrentBuild: () => Promise<void>;
+  saveCurrentBuild: () => void;
+  loadBuild: (id: string) => void;
+  renameBuild: (id: string, name: string) => void;
+  duplicateBuild: (id: string) => void;
+  deleteBuild: (id: string) => void;
 }
 
 const FitmentContext = createContext<FitmentContextValue | null>(null);
@@ -64,29 +82,27 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
   const selectedAccessory =
     demoAccessories.find((item) => item.id === selectedAccessoryId) ?? demoAccessories[0];
 
-  const evaluation = useMemo(
+  const evaluations = useMemo(
     () =>
-      evaluateCompatibility({
-        host: demoHost,
-        accessory: selectedAccessory,
-        adapters: demoAdapters,
-        exclusions: demoExclusions,
-        evidenceSources: demoEvidence,
-        adapterGraphCompleteness: "PARTIAL",
-        engineVersion: ENGINE_VERSION,
-        dimensionChecks: [
-          {
-            code: "CONTROL_CLEARANCE",
-            label: "Control clearance",
-            result: "UNKNOWN",
-            critical: false,
-            explanation: "Control clearance has not been physically verified for this demonstration combination.",
-            evidenceSourceIds: [],
-          },
-        ],
-      }),
-    [selectedAccessory],
+      new Map(
+        demoAccessories.map((accessory) => [
+          accessory.id,
+          evaluateCompatibility({
+            host: demoHost,
+            accessory,
+            adapters: demoAdapters,
+            exclusions: demoExclusions,
+            evidenceSources: demoEvidence,
+            adapterGraphCompleteness: "PARTIAL",
+            engineVersion: ENGINE_VERSION,
+            dimensionChecks: demoDimensionChecks,
+          }),
+        ]),
+      ),
+    [],
   );
+
+  const evaluation = evaluations.get(selectedAccessory.id) ?? evaluations.get(demoAccessories[0].id)!;
 
   const requiredProducts = useMemo(
     () =>
@@ -113,7 +129,11 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
         }
         if (savedRaw) {
           const saved = JSON.parse(savedRaw) as SavedBuild[];
-          if (Array.isArray(saved)) setSavedBuilds(saved);
+          if (Array.isArray(saved)) {
+            setSavedBuilds(
+              saved.map((build) => ({ ...build, updatedAt: build.updatedAt ?? build.savedAt })),
+            );
+          }
         }
       } finally {
         setHydrated(true);
@@ -127,6 +147,11 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
     if (!hydrated) return;
     void AsyncStorage.setItem(CURRENT_BUILD_KEY, JSON.stringify(buildItems.map((item) => item.id)));
   }, [buildItems, hydrated]);
+
+  useEffect(() => {
+    if (!hydrated) return;
+    void AsyncStorage.setItem(SAVED_BUILDS_KEY, JSON.stringify(savedBuilds));
+  }, [savedBuilds, hydrated]);
 
   const totals = useMemo<BuildTotals>(() => {
     const prices = [demoHost.knownPriceCents, ...buildItems.map((item) => item.knownPriceCents)];
@@ -175,24 +200,66 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
     void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
-  async function saveCurrentBuild() {
-    const record: SavedBuild = {
-      id: String(Date.now()),
-      name: `Build ${savedBuilds.length + 1}`,
-      componentIds: buildItems.map((item) => item.id),
-      engineVersion: ENGINE_VERSION,
-      savedAt: new Date().toISOString(),
-    };
-    const next = [record, ...savedBuilds];
-    setSavedBuilds(next);
-    await AsyncStorage.setItem(SAVED_BUILDS_KEY, JSON.stringify(next));
+  function saveCurrentBuild() {
+    const now = new Date().toISOString();
+    setSavedBuilds((current) => {
+      const record: SavedBuild = {
+        id: String(Date.now()),
+        name: `Build ${current.length + 1}`,
+        componentIds: buildItems.map((item) => item.id),
+        engineVersion: ENGINE_VERSION,
+        savedAt: now,
+        updatedAt: now,
+      };
+      return [record, ...current];
+    });
     void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  function loadBuild(id: string) {
+    const build = savedBuilds.find((item) => item.id === id);
+    if (!build) return;
+    setBuildItems(productsFromIds(build.componentIds));
+    void Haptics.notificationAsync(Haptics.NotificationFeedbackType.Success);
+  }
+
+  function renameBuild(id: string, name: string) {
+    const trimmed = name.trim();
+    if (!trimmed) return;
+    setSavedBuilds((current) =>
+      current.map((build) =>
+        build.id === id ? { ...build, name: trimmed, updatedAt: new Date().toISOString() } : build,
+      ),
+    );
+  }
+
+  function duplicateBuild(id: string) {
+    setSavedBuilds((current) => {
+      const source = current.find((build) => build.id === id);
+      if (!source) return current;
+      const now = new Date().toISOString();
+      const copy: SavedBuild = {
+        ...source,
+        id: String(Date.now()),
+        name: `${source.name} copy`,
+        savedAt: now,
+        updatedAt: now,
+      };
+      return [copy, ...current];
+    });
+    void Haptics.selectionAsync();
+  }
+
+  function deleteBuild(id: string) {
+    setSavedBuilds((current) => current.filter((build) => build.id !== id));
+    void Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Medium);
   }
 
   const value = useMemo<FitmentContextValue>(
     () => ({
       selectedAccessory,
       evaluation,
+      evaluations,
       requiredProducts,
       buildItems,
       savedBuilds,
@@ -203,16 +270,13 @@ export function FitmentProvider({ children }: { children: ReactNode }) {
       removeFromBuild,
       clearBuild,
       saveCurrentBuild,
+      loadBuild,
+      renameBuild,
+      duplicateBuild,
+      deleteBuild,
     }),
-    [
-      selectedAccessory,
-      evaluation,
-      requiredProducts,
-      buildItems,
-      savedBuilds,
-      totals,
-      blocked,
-    ],
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [selectedAccessory, evaluation, evaluations, requiredProducts, buildItems, savedBuilds, totals, blocked],
   );
 
   return <FitmentContext.Provider value={value}>{children}</FitmentContext.Provider>;
