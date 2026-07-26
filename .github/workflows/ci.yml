@@ -18,11 +18,11 @@ jobs:
           version: 10.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.13
       - run: pnpm install --frozen-lockfile=false
       - run: pnpm test:engine
 
-  web-build:
+  ios-app:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -31,21 +31,31 @@ jobs:
           version: 10.13.1
       - uses: actions/setup-node@v4
         with:
-          node-version: 22
+          node-version: 22.13
       - run: pnpm install --frozen-lockfile=false
-      - name: Build web
-        id: web_build
+      - name: Typecheck mobile app
+        id: mobile_typecheck
         continue-on-error: true
-        run: pnpm --filter @fitment/web build > web-build.log 2>&1
-        env:
-          NEXT_PUBLIC_SUPABASE_URL: https://example.supabase.co
-          NEXT_PUBLIC_SUPABASE_ANON_KEY: example-anon-key
-      - name: Preserve web build log
+        run: pnpm --filter @fitment/mobile typecheck > mobile-typecheck.log 2>&1
+      - name: Preserve mobile typecheck log
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: web-build-log
-          path: web-build.log
-      - name: Report web build failure
-        if: steps.web_build.outcome == 'failure'
-        run: cat web-build.log && exit 1
+          name: mobile-typecheck-log
+          path: mobile-typecheck.log
+      - name: Report mobile typecheck failure
+        if: steps.mobile_typecheck.outcome == 'failure'
+        run: cat mobile-typecheck.log && exit 1
+      - name: Export iOS JavaScript bundle
+        id: ios_export
+        continue-on-error: true
+        run: pnpm --filter @fitment/mobile export:ios > ios-export.log 2>&1
+      - name: Preserve iOS export log
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: ios-export-log
+          path: ios-export.log
+      - name: Report iOS export failure
+        if: steps.ios_export.outcome == 'failure'
+        run: cat ios-export.log && exit 1

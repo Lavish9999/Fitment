@@ -4,20 +4,23 @@
   "private": true,
   "packageManager": "pnpm@10.13.1",
   "engines": {
-    "node": ">=22"
+    "node": ">=22.13"
   },
   "scripts": {
-    "dev": "turbo dev",
+    "dev": "pnpm mobile",
+    "mobile": "pnpm --filter @fitment/mobile start",
+    "ios": "pnpm --filter @fitment/mobile ios",
+    "export:ios": "pnpm --filter @fitment/mobile export:ios",
     "build": "turbo build",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "pnpm test:engine",
     "test:engine": "rm -rf .test-dist && tsc -p tsconfig.engine.json && node --test tests/*.test.mjs",
-    "check": "pnpm test:engine"
+    "check": "pnpm test:engine && pnpm --filter @fitment/mobile typecheck"
   },
   "devDependencies": {
     "turbo": "^2.5.4",
-    "typescript": "^5.8.3"
+    "typescript": "^5.9.0"
   },
   "type": "module"
 }
