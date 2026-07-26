@@ -36,7 +36,7 @@ jobs:
       - name: Check Expo package compatibility
         id: expo_doctor
         continue-on-error: true
-        run: pnpm --filter @fitment/mobile doctor > expo-doctor.log 2>&1
+        run: pnpm --filter @fitment/mobile run doctor > expo-doctor.log 2>&1
       - name: Preserve Expo Doctor log
         if: always()
         uses: actions/upload-artifact@v4
