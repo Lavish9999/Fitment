@@ -11,6 +11,7 @@
     "doctor": "npx expo-doctor@latest"
   },
   "dependencies": {
+    "@expo/vector-icons": "^15.0.3",
     "@fitment/catalog": "workspace:*",
     "@fitment/compatibility-engine": "workspace:*",
     "@fitment/domain": "workspace:*",
