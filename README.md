@@ -2,26 +2,31 @@
 
 **Know what fits before you buy.**
 
-FITMENT is an evidence-driven firearm accessory compatibility, configuration, private ownership-record, and shopping-research platform. This repository begins with the deterministic compatibility foundation and a working web demonstration of the core loop.
+FITMENT is an iOS-first mobile application for evidence-driven firearm accessory compatibility, build planning, private ownership records, and shopping research. The production customer experience is React Native with Expo—not a consumer website.
 
 > Demonstration records are marked `DEMO_UNVERIFIED`. They are not manufacturer claims and must not be used as purchase, installation, safety, or legal guidance.
 
-## Current vertical slice
+## Current native vertical slice
 
+- portrait iPhone application using Expo Router;
+- native safe-area layout and mobile touch targets;
 - exact demonstration firearm variant;
-- accessory selection;
+- native accessory selection sheet;
 - direct and adapter-path evaluation;
 - explicit unknown and conflict states;
 - required-component explanation;
+- evidence-limited confidence wording;
 - known price and weight calculations;
-- local immutable-style demo snapshots carrying the engine version;
-- Supabase schema for authenticated builds, RLS-protected Armory records, encrypted sensitive fields, and sanitized public publication.
+- haptic feedback for selections and build actions;
+- on-device build snapshots through AsyncStorage;
+- Supabase schema for future authenticated builds, RLS-protected Armory records, encrypted sensitive fields, and sanitized public sharing.
 
 ## Workspace
 
 ```text
 apps/
-  web/
+  mobile/          # iOS-first customer application
+  web/             # legacy Phase 1 test harness; not the product surface
 packages/
   domain/
   compatibility-engine/
@@ -30,43 +35,55 @@ supabase/
   migrations/
   seed.sql
 docs/
-  architecture/
-  compatibility/
-  data-model/
-  product/
-  security/
 tests/
 ```
 
+The web harness is excluded from the product CI path and is scheduled for removal after the native vertical slice is verified on-device.
+
 ## Prerequisites
 
-- Node.js 22+
+- Node.js 22.13+
 - pnpm 10+
-- Supabase CLI for local database work
+- Expo Go on an iPhone for the fastest device test
+- Xcode on macOS for the iOS Simulator or native development build
+- Supabase CLI only when testing database migrations
 
 ## Install
 
 ```bash
 corepack enable
 pnpm install
-cp .env.example .env.local
 ```
 
-## Run the web app
+## Run on an iPhone with Expo Go
 
 ```bash
-pnpm --filter @fitment/web dev
+pnpm mobile
 ```
 
-Then open `http://localhost:3000` and use the Builder route.
+Scan the QR code with the iPhone Camera app and open it in Expo Go. The phone and computer should be on the same network. If LAN discovery is blocked, run:
 
-## Test the deterministic engine
+```bash
+pnpm --filter @fitment/mobile start --tunnel
+```
 
-The engine test does not require a running database:
+## Run in the iOS Simulator
+
+```bash
+pnpm ios
+```
+
+This requires macOS with Xcode and an iOS Simulator installed.
+
+## Validate the native app
 
 ```bash
 pnpm test:engine
+pnpm --filter @fitment/mobile typecheck
+pnpm export:ios
 ```
+
+The iOS export validates that Metro can bundle the mobile application and the shared workspace packages.
 
 ## Supabase local setup
 
@@ -76,14 +93,6 @@ supabase db reset
 ```
 
 The reset applies migrations and loads `supabase/seed.sql`.
-
-## Validation commands
-
-```bash
-pnpm test:engine
-pnpm typecheck
-pnpm --filter @fitment/web build
-```
 
 ## Security boundaries
 
@@ -106,6 +115,6 @@ pnpm --filter @fitment/web build
 ## Current limitations
 
 - Demo catalog only; it is intentionally too weak to produce verified claims.
-- Supabase authentication UI and hosted project configuration are not wired yet.
-- Mobile and dedicated admin apps are the next application shells.
-- Retailer offers, live prices, community reports, and 3D are not implemented.
+- Supabase authentication and cloud build persistence are not wired yet.
+- The mobile vertical slice currently contains one Builder screen rather than the complete tab system.
+- Retailer offers, live prices, community reports, admin tooling, and 3D are not implemented.
