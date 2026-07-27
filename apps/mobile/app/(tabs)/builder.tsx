@@ -29,6 +29,8 @@ export default function BuilderScreen() {
   } = useFitment();
   const presentation = statusPresentation(evaluation);
   const alreadyAdded = buildItems.some((item) => item.id === selectedAccessory.id);
+  const installedIds = buildItems.map((item) => item.id);
+  const previewId = blocked || alreadyAdded ? undefined : selectedAccessory.id;
 
   return (
     <Screen>
@@ -38,6 +40,9 @@ export default function BuilderScreen() {
         productVariantId={selectedHost.id}
         productName={selectedHost.exactModel}
         manufacturer={selectedHost.manufacturer}
+        installedComponentIds={installedIds}
+        previewComponentId={previewId}
+        previewRequiredComponentIds={alreadyAdded ? [] : requiredProducts.map((product) => product.id)}
         onPress={() => router.push("/select-firearm")}
       />
 
