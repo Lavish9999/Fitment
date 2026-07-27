@@ -5,13 +5,7 @@ import type {
   EvidenceSource,
 } from "../../domain/src/index.js";
 
-import {
-  demoAccessories,
-  demoAdapters,
-  demoEvidence,
-  demoExclusions,
-  demoRequiredComponents,
-} from "./demo.js";
+import { demoAccessories } from "./demo.js";
 
 export interface CatalogDataset {
   id: string;
@@ -53,8 +47,8 @@ const manufacturerEvidence: EvidenceSource[] = [
   {
     id: "evidence-sig-p365-xmacro-official",
     kind: "MANUFACTURER_DOCUMENTATION",
-    title: "SIG SAUER P365-XMACRO official introduction and specifications",
-    url: "https://www.sigsauer.com/blog/sig-sauer-introduces-p365-xmacro-bringing-even-more-to-everyday-carry",
+    title: "SIG SAUER P365-XMACRO official specifications",
+    url: "https://www.sigsauer.com/p365-xmacro.html",
     exactCombinationVerified: true,
     reviewedAt: "2026-07-26T00:00:00.000Z",
   },
@@ -63,6 +57,30 @@ const manufacturerEvidence: EvidenceSource[] = [
     kind: "MANUFACTURER_DOCUMENTATION",
     title: "SIG SAUER ROMEOZero Elite official product specifications",
     url: "https://www.sigsauer.com/romeozero-elite-1x24-mm.html",
+    exactCombinationVerified: true,
+    reviewedAt: "2026-07-26T00:00:00.000Z",
+  },
+  {
+    id: "evidence-trijicon-rmr-rm06-authorized-retailer",
+    kind: "AUTHORIZED_RETAILER",
+    title: "Trijicon RM06 RMR Type 2 authorized-dealer product record",
+    url: "https://www.bhphotovideo.com/c/product/1366441-REG/trijicon_rm06_c_700672_rm06_rmr_type_2.html/overview",
+    exactCombinationVerified: false,
+    reviewedAt: "2026-07-26T00:00:00.000Z",
+  },
+  {
+    id: "evidence-streamlight-tlr7x-official",
+    kind: "MANUFACTURER_DOCUMENTATION",
+    title: "Streamlight TLR-7 X official product specifications",
+    url: "https://www.streamlight.com/products/detail/tlr-7-x",
+    exactCombinationVerified: false,
+    reviewedAt: "2026-07-26T00:00:00.000Z",
+  },
+  {
+    id: "evidence-streamlight-tlr7x-sub-official",
+    kind: "MANUFACTURER_DOCUMENTATION",
+    title: "Streamlight TLR-7 X sub official product specifications and XMACRO fit listing",
+    url: "https://www.streamlight.com/products/detail/tlr-7-x-sub",
     exactCombinationVerified: true,
     reviewedAt: "2026-07-26T00:00:00.000Z",
   },
@@ -163,6 +181,68 @@ const romeoZeroElite: CatalogVariant = {
   ],
   dependencies: [],
   knownPriceCents: 19999,
+  knownWeightGrams: 14,
+  dataCompleteness: "PARTIAL",
+};
+
+const trijiconRmrType2: CatalogVariant = {
+  id: "optic-trijicon-rmr-type2-rm06",
+  manufacturer: "Trijicon",
+  family: "RMR Type 2",
+  exactModel: "RMR Type 2 RM06 — 3.25 MOA",
+  sku: "RM06-C-700672",
+  category: "RED_DOT_OPTIC",
+  provides: [],
+  requires: [
+    {
+      interfaceId: "RM_RMR_FOOTPRINT",
+      location: "optic base",
+      evidenceSourceId: "evidence-trijicon-rmr-rm06-authorized-retailer",
+      verificationStatus: "PARTIAL",
+    },
+  ],
+  dependencies: [],
+  knownWeightGrams: 34,
+  dataCompleteness: "PARTIAL",
+};
+
+const streamlightTlr7X: CatalogVariant = {
+  id: "light-streamlight-tlr7-x",
+  manufacturer: "Streamlight",
+  family: "TLR-7 X",
+  exactModel: "TLR-7 X — Black",
+  category: "WEAPON_LIGHT",
+  provides: [],
+  requires: [
+    {
+      interfaceId: "GLOCK_UNIVERSAL_RAIL",
+      location: "rail-grip clamp with GLOCK key",
+      evidenceSourceId: "evidence-streamlight-tlr7x-official",
+      verificationStatus: "PARTIAL",
+    },
+  ],
+  dependencies: [],
+  knownWeightGrams: 75,
+  dataCompleteness: "PARTIAL",
+};
+
+const streamlightTlr7XSub1913: CatalogVariant = {
+  id: "light-streamlight-tlr7-x-sub-1913",
+  manufacturer: "Streamlight",
+  family: "TLR-7 X sub",
+  exactModel: "TLR-7 X sub — 1913 model",
+  category: "WEAPON_LIGHT",
+  provides: [],
+  requires: [
+    {
+      interfaceId: "PICATINNY_1913_COMPACT",
+      location: "1913 clamp",
+      evidenceSourceId: "evidence-streamlight-tlr7x-sub-official",
+      verificationStatus: "VERIFIED",
+    },
+  ],
+  dependencies: [],
+  knownWeightGrams: 75,
   dataCompleteness: "PARTIAL",
 };
 
@@ -206,16 +286,26 @@ const manufacturerAdapters: AdapterConnection[] = [
   },
 ];
 
+const diagnosticUnknownAccessory = demoAccessories.find(
+  (accessory) => accessory.id === "optic-unknown-demo",
+)!;
+
 export const phase1Catalog: CatalogDataset = {
   id: "fitment-phase1-preview",
-  revision: 1,
+  revision: 2,
   mode: "PREVIEW",
   firearms: [sigP365XMacro, glock19Gen5Mos, glock19Gen4Mos],
-  accessories: [romeoZeroElite, ...demoAccessories],
-  requiredComponents: [glockMosPlate02, ...demoRequiredComponents],
-  adapters: [...manufacturerAdapters, ...demoAdapters],
-  exclusions: [...demoExclusions],
-  evidenceSources: [...manufacturerEvidence, ...demoEvidence],
+  accessories: [
+    romeoZeroElite,
+    trijiconRmrType2,
+    streamlightTlr7X,
+    streamlightTlr7XSub1913,
+    diagnosticUnknownAccessory,
+  ],
+  requiredComponents: [glockMosPlate02],
+  adapters: manufacturerAdapters,
+  exclusions: [],
+  evidenceSources: manufacturerEvidence,
 };
 
 export const phase1ProductsById = new Map(

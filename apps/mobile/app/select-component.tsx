@@ -1,12 +1,13 @@
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useMemo, useState } from "react";
-import { Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useState } from "react";
+import { Image, Pressable, ScrollView, StyleSheet, Text, TextInput, View } from "react-native";
 
 import { ModalScreen } from "../src/components/ui";
 import { categoryLabel, money, statusPresentation } from "../src/presentation";
 import { useFitment } from "../src/state/FitmentProvider";
 import { colors, fontFamily, radius, spacing } from "../src/theme";
+import { getExactProductVisual } from "../src/visuals/exactProductVisuals";
 
 export default function SelectComponentScreen() {
   const router = useRouter();
@@ -14,12 +15,23 @@ export default function SelectComponentScreen() {
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState<string | null>(null);
 
-  const categories = useMemo(
-    () => [...new Set(accessories.map((product) => product.category))],
+  const customerAccessories = useMemo(
+    () =>
+      accessories.filter(
+        (product) =>
+          !product.id.includes("-demo") &&
+          !product.manufacturer.toLowerCase().includes("demo") &&
+          product.manufacturer !== "Unknown Maker",
+      ),
     [accessories],
   );
 
-  const results = accessories.filter((product) => {
+  const categories = useMemo(
+    () => [...new Set(customerAccessories.map((product) => product.category))],
+    [customerAccessories],
+  );
+
+  const results = customerAccessories.filter((product) => {
     if (category && product.category !== category) return false;
     if (!query.trim()) return true;
     const haystack = `${product.manufacturer} ${product.family} ${product.exactModel} ${product.sku ?? ""}`.toLowerCase();
@@ -34,6 +46,7 @@ export default function SelectComponentScreen() {
   return (
     <ModalScreen title="Choose component" scroll={false}>
       <View style={styles.searchWrap}>
+        <Text style={styles.helper}>Only exact catalog products are shown. Selecting one updates the firearm preview immediately.</Text>
         <View style={styles.searchField}>
           <Ionicons name="search" size={16} color={colors.inkFaint} />
           <TextInput
@@ -61,7 +74,7 @@ export default function SelectComponentScreen() {
 
       <ScrollView contentContainerStyle={styles.list} showsVerticalScrollIndicator={false}>
         {results.length === 0 ? (
-          <Text style={styles.noResults}>No components match this search.</Text>
+          <Text style={styles.noResults}>No exact components match this search.</Text>
         ) : (
           results.map((product) => {
             const selected = product.id === selectedAccessory.id;
@@ -78,9 +91,10 @@ export default function SelectComponentScreen() {
                   pressed ? styles.pressed : null,
                 ]}
               >
-                <View style={styles.thumb}>
-                  <Ionicons name="image-outline" size={18} color={colors.inkFaint} />
-                </View>
+                <ComponentThumbnail
+                  productVariantId={product.id}
+                  label={`${product.manufacturer} ${product.exactModel}`}
+                />
                 <View style={styles.rowCopy}>
                   <Text style={styles.brand}>{product.manufacturer}</Text>
                   <Text style={styles.model}>{product.exactModel}</Text>
@@ -101,6 +115,31 @@ export default function SelectComponentScreen() {
   );
 }
 
+function ComponentThumbnail({ productVariantId, label }: { productVariantId: string; label: string }) {
+  const visual = getExactProductVisual(productVariantId);
+  const [failed, setFailed] = useState(false);
+
+  useEffect(() => {
+    setFailed(false);
+  }, [productVariantId, visual?.imageUri]);
+
+  return (
+    <View style={[styles.thumb, visual?.background === "BLACK" ? styles.thumbDark : styles.thumbLight]}>
+      {visual && !failed ? (
+        <Image
+          accessibilityLabel={`${label} product image`}
+          source={{ uri: visual.imageUri }}
+          resizeMode="contain"
+          onError={() => setFailed(true)}
+          style={styles.thumbImage}
+        />
+      ) : (
+        <Ionicons name="image-outline" size={18} color={colors.inkFaint} />
+      )}
+    </View>
+  );
+}
+
 function Chip({ label, active, onPress }: { label: string; active: boolean; onPress: () => void }) {
   return (
     <Pressable
@@ -115,6 +154,7 @@ function Chip({ label, active, onPress }: { label: string; active: boolean; onPr
 
 const styles = StyleSheet.create({
   searchWrap: { paddingHorizontal: spacing.md, paddingTop: spacing.sm, gap: spacing.xs },
+  helper: { color: colors.inkSoft, fontFamily, fontSize: 12, lineHeight: 17 },
   searchField: {
     minHeight: 40,
     flexDirection: "row",
@@ -153,13 +193,16 @@ const styles = StyleSheet.create({
   rowSelected: { borderColor: colors.accent, borderWidth: 1 },
   pressed: { opacity: 0.7 },
   thumb: {
-    width: 48,
-    height: 48,
+    width: 64,
+    height: 54,
     borderRadius: radius.sm,
     alignItems: "center",
     justifyContent: "center",
-    backgroundColor: colors.surfaceMuted,
+    overflow: "hidden",
   },
+  thumbLight: { backgroundColor: "#FFFFFF" },
+  thumbDark: { backgroundColor: "#050505" },
+  thumbImage: { width: "100%", height: "100%" },
   rowCopy: { flex: 1 },
   brand: { color: colors.inkFaint, fontFamily, fontSize: 12 },
   model: { color: colors.ink, fontFamily, fontSize: 15, lineHeight: 20, fontWeight: "600", marginTop: 1 },
