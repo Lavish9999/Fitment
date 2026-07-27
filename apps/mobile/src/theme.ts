@@ -16,7 +16,7 @@ export const colors = {
   warningSoft: "#F6ECDA",
   danger: "#A8433C",
   dangerSoft: "#F6E5E2",
-  nav: "#1C1B18",
+  nav: "#191916",
   white: "#FFFFFF",
 } as const;
 
@@ -39,13 +39,21 @@ export const radius = {
 
 export const fontFamily = Platform.OS === "ios" ? "System" : "sans-serif";
 
-// Floating tab bar metrics shared between the tab layout and every
-// scrollable screen so content never hides beneath the navigation.
 export const tabBarMetrics = {
-  height: 56,
-  bottomOffset: 10,
-  clearance: 24,
+  height: 58,
+  horizontalInset: 28,
+  minimumBottomOffset: 8,
+  bottomOffset: 8,
+  clearance: 22,
 } as const;
+
+export function tabBarBottom(safeAreaBottom: number): number {
+  return Math.max(safeAreaBottom - 14, tabBarMetrics.minimumBottomOffset);
+}
+
+export function screenBottomPadding(safeAreaBottom: number): number {
+  return tabBarBottom(safeAreaBottom) + tabBarMetrics.height + tabBarMetrics.clearance;
+}
 
 export const shadow = {
   shadowColor: "#000000",

@@ -2,12 +2,9 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { Alert, Platform, Pressable, StyleSheet, Text, View } from "react-native";
 
-import { demoHost, demoProductsById } from "@fitment/catalog";
-
 import {
   AppHeader,
   Card,
-  EmptyState,
   MetricRow,
   PrimaryButton,
   Screen,
@@ -18,19 +15,14 @@ import { money } from "../../src/presentation";
 import { useFitment, type SavedBuild } from "../../src/state/FitmentProvider";
 import { colors, fontFamily, radius, spacing } from "../../src/theme";
 
-function savedBuildPrice(build: SavedBuild): string {
-  const prices = build.componentIds.map((id) => demoProductsById.get(id)?.knownPriceCents);
-  if (prices.some((value) => value === undefined)) return "Price incomplete";
-  const total = prices.reduce<number>((sum, value) => sum + (value ?? 0), 0);
-  return money(total + (demoHost.knownPriceCents ?? 0));
-}
-
 export default function ArmoryScreen() {
   const router = useRouter();
   const {
+    selectedHost,
     buildItems,
     savedBuilds,
     totals,
+    productById,
     removeFromBuild,
     clearBuild,
     saveCurrentBuild,
@@ -39,6 +31,13 @@ export default function ArmoryScreen() {
     duplicateBuild,
     deleteBuild,
   } = useFitment();
+
+  function savedBuildPrice(build: SavedBuild): string {
+    const host = productById(build.hostId);
+    const prices = [host?.knownPriceCents, ...build.componentIds.map((id) => productById(id)?.knownPriceCents)];
+    if (prices.some((value) => value === undefined)) return "Price incomplete";
+    return money(prices.reduce<number>((sum, value) => sum + (value ?? 0), 0));
+  }
 
   function promptRename(build: SavedBuild) {
     if (Platform.OS === "ios") {
@@ -80,17 +79,19 @@ export default function ArmoryScreen() {
             <Ionicons name="barcode-outline" size={18} color={colors.ink} />
           </View>
           <View style={styles.hostCopy}>
-            <Text style={styles.hostMaker}>{demoHost.manufacturer}</Text>
-            <Text style={styles.hostName}>{demoHost.exactModel}</Text>
+            <Text style={styles.hostMaker}>{selectedHost.manufacturer}</Text>
+            <Text style={styles.hostName}>{selectedHost.exactModel}</Text>
           </View>
         </View>
 
         {buildItems.length === 0 ? (
-          <EmptyState
-            icon="add-circle-outline"
-            title="No components yet"
-            body="Use Builder to add a compatible component and any required parts."
-          />
+          <View style={styles.compactEmpty}>
+            <Ionicons name="add-circle-outline" size={22} color={colors.inkFaint} />
+            <View style={styles.compactEmptyCopy}>
+              <Text style={styles.compactEmptyTitle}>No components yet</Text>
+              <Text style={styles.compactEmptyBody}>Use Builder to add a compatible component and required parts.</Text>
+            </View>
+          </View>
         ) : (
           <View style={styles.itemList}>
             {buildItems.map((item) => (
@@ -115,15 +116,8 @@ export default function ArmoryScreen() {
 
         <View style={styles.metrics}>
           <MetricRow label="Known total" value={money(totals.price)} />
-          <MetricRow
-            label="Configured weight"
-            value={totals.weight === undefined ? "Unknown" : `${totals.weight} g`}
-          />
-          <MetricRow
-            label="Incomplete values"
-            value={String(totals.unknownPrices + totals.unknownWeights)}
-            last
-          />
+          <MetricRow label="Configured weight" value={totals.weight === undefined ? "Unknown" : `${totals.weight} g`} />
+          <MetricRow label="Incomplete values" value={String(totals.unknownPrices + totals.unknownWeights)} last />
         </View>
 
         {buildItems.length > 0 ? (
@@ -136,139 +130,97 @@ export default function ArmoryScreen() {
 
       <SectionTitle>Saved builds</SectionTitle>
       {savedBuilds.length === 0 ? (
-        <Card>
-          <EmptyState
-            icon="bookmark-outline"
-            title="Nothing saved"
-            body="Save the current build to keep a named snapshot on this iPhone."
-          />
+        <Card style={styles.compactCard}>
+          <View style={styles.compactEmpty}>
+            <Ionicons name="bookmark-outline" size={22} color={colors.inkFaint} />
+            <View style={styles.compactEmptyCopy}>
+              <Text style={styles.compactEmptyTitle}>Nothing saved</Text>
+              <Text style={styles.compactEmptyBody}>Save a named snapshot of the current exact configuration.</Text>
+            </View>
+          </View>
         </Card>
       ) : (
         <Card style={styles.listCard}>
-          {savedBuilds.map((build, index) => (
-            <Pressable
-              key={build.id}
-              accessibilityRole="button"
-              onPress={() => openBuildActions(build)}
-              style={({ pressed }) => [
-                styles.savedRow,
-                index === savedBuilds.length - 1 ? styles.savedRowLast : null,
-                pressed ? styles.pressed : null,
-              ]}
-            >
-              <View style={styles.savedGlyph}>
-                <Ionicons name="cube-outline" size={17} color={colors.inkSoft} />
-              </View>
-              <View style={styles.savedCopy}>
-                <Text style={styles.savedTitle}>{build.name}</Text>
-                <Text style={styles.savedMeta}>
-                  {build.componentIds.length} component{build.componentIds.length === 1 ? "" : "s"} ·{" "}
-                  {savedBuildPrice(build)} · engine {build.engineVersion}
+          {savedBuilds.map((build, index) => {
+            const host = productById(build.hostId);
+            return (
+              <Pressable
+                key={build.id}
+                accessibilityRole="button"
+                onPress={() => openBuildActions(build)}
+                style={({ pressed }) => [
+                  styles.savedRow,
+                  index === savedBuilds.length - 1 ? styles.savedRowLast : null,
+                  pressed ? styles.pressed : null,
+                ]}
+              >
+                <View style={styles.savedGlyph}>
+                  <Ionicons name="cube-outline" size={17} color={colors.inkSoft} />
+                </View>
+                <View style={styles.savedCopy}>
+                  <Text style={styles.savedTitle}>{build.name}</Text>
+                  <Text style={styles.savedMeta}>
+                    {host?.exactModel ?? "Unknown host"} · {build.componentIds.length} component{build.componentIds.length === 1 ? "" : "s"} · {savedBuildPrice(build)}
+                  </Text>
+                </View>
+                <Text style={styles.savedDate}>
+                  {new Date(build.updatedAt).toLocaleDateString("en-US", { month: "short", day: "numeric" })}
                 </Text>
-              </View>
-              <Text style={styles.savedDate}>
-                {new Date(build.updatedAt).toLocaleDateString("en-US", {
-                  month: "short",
-                  day: "numeric",
-                })}
-              </Text>
-            </Pressable>
-          ))}
+              </Pressable>
+            );
+          })}
         </Card>
       )}
 
-      <SectionTitle>Owned firearms</SectionTitle>
+      <SectionTitle>Selected firearm</SectionTitle>
       <Card style={styles.listCard}>
-        <View style={[styles.savedRow, styles.savedRowLast]}>
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push("/select-firearm")}
+          style={({ pressed }) => [styles.savedRow, styles.savedRowLast, pressed ? styles.pressed : null]}
+        >
           <View style={styles.savedGlyph}>
             <Ionicons name="barcode-outline" size={17} color={colors.inkSoft} />
           </View>
           <View style={styles.savedCopy}>
-            <Text style={styles.savedTitle}>{demoHost.exactModel}</Text>
-            <Text style={styles.savedMeta}>
-              {demoHost.manufacturer} · {money(demoHost.knownPriceCents)}
-            </Text>
+            <Text style={styles.savedTitle}>{selectedHost.exactModel}</Text>
+            <Text style={styles.savedMeta}>{selectedHost.manufacturer} · {money(selectedHost.knownPriceCents)}</Text>
           </View>
-        </View>
+          <Ionicons name="chevron-forward" size={16} color={colors.inkFaint} />
+        </Pressable>
       </Card>
-      <Text style={styles.footnote}>
-        Ownership records stay on this iPhone. Nothing is synced to an account yet.
-      </Text>
+      <Text style={styles.footnote}>Selection does not claim ownership. Private ownership records arrive later in Phase 1.</Text>
     </Screen>
   );
 }
 
 const styles = StyleSheet.create({
   hostLine: { flexDirection: "row", alignItems: "center", gap: spacing.sm },
-  hostIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceMuted,
-  },
+  hostIcon: { width: 36, height: 36, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceMuted },
   hostCopy: { flex: 1 },
   hostMaker: { color: colors.inkFaint, fontFamily, fontSize: 12 },
   hostName: { color: colors.ink, fontFamily, fontSize: 15, lineHeight: 20, fontWeight: "600", marginTop: 1 },
-  itemList: {
-    marginTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line,
-  },
-  itemRow: {
-    minHeight: 56,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
-  },
+  compactCard: { paddingVertical: spacing.xs },
+  compactEmpty: { minHeight: 86, flexDirection: "row", alignItems: "center", gap: spacing.sm, marginTop: spacing.sm, paddingVertical: spacing.sm },
+  compactEmptyCopy: { flex: 1 },
+  compactEmptyTitle: { color: colors.ink, fontFamily, fontSize: 14, fontWeight: "600" },
+  compactEmptyBody: { color: colors.inkSoft, fontFamily, fontSize: 13, lineHeight: 18, marginTop: 2 },
+  itemList: { marginTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
+  itemRow: { minHeight: 56, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   itemCopy: { flex: 1, paddingVertical: spacing.xs },
   itemTitle: { color: colors.ink, fontFamily, fontSize: 14, lineHeight: 19, fontWeight: "600" },
   itemMeta: { color: colors.inkSoft, fontFamily, fontSize: 12, marginTop: 3 },
-  removeButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.dangerSoft,
-  },
+  removeButton: { width: 32, height: 32, borderRadius: 16, alignItems: "center", justifyContent: "center", backgroundColor: colors.dangerSoft },
   pressed: { opacity: 0.62 },
-  metrics: {
-    marginTop: spacing.sm,
-    borderTopWidth: StyleSheet.hairlineWidth,
-    borderTopColor: colors.line,
-  },
+  metrics: { marginTop: spacing.sm, borderTopWidth: StyleSheet.hairlineWidth, borderTopColor: colors.line },
   actions: { gap: spacing.xs, marginTop: spacing.md },
   listCard: { paddingVertical: spacing.xxs },
-  savedRow: {
-    minHeight: 60,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: spacing.sm,
-    borderBottomWidth: StyleSheet.hairlineWidth,
-    borderBottomColor: colors.line,
-  },
+  savedRow: { minHeight: 60, flexDirection: "row", alignItems: "center", gap: spacing.sm, borderBottomWidth: StyleSheet.hairlineWidth, borderBottomColor: colors.line },
   savedRowLast: { borderBottomWidth: 0 },
-  savedGlyph: {
-    width: 34,
-    height: 34,
-    borderRadius: 11,
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: colors.surfaceMuted,
-  },
+  savedGlyph: { width: 34, height: 34, borderRadius: 11, alignItems: "center", justifyContent: "center", backgroundColor: colors.surfaceMuted },
   savedCopy: { flex: 1, paddingVertical: spacing.xs },
   savedTitle: { color: colors.ink, fontFamily, fontSize: 14, fontWeight: "600" },
   savedMeta: { color: colors.inkSoft, fontFamily, fontSize: 12, lineHeight: 17, marginTop: 3 },
   savedDate: { color: colors.inkFaint, fontFamily, fontSize: 12 },
-  footnote: {
-    color: colors.inkFaint,
-    fontFamily,
-    fontSize: 12,
-    lineHeight: 17,
-    marginTop: spacing.xs,
-  },
+  footnote: { color: colors.inkFaint, fontFamily, fontSize: 12, lineHeight: 17, marginTop: spacing.xs },
 });
