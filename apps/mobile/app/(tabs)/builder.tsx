@@ -41,8 +41,8 @@ export default function BuilderScreen() {
         productName={selectedHost.exactModel}
         manufacturer={selectedHost.manufacturer}
         installedComponentIds={installedIds}
-        previewComponentId={previewId}
         previewRequiredComponentIds={alreadyAdded ? [] : requiredProducts.map((product) => product.id)}
+        {...(previewId ? { previewComponentId: previewId } : {})}
         onPress={() => router.push("/select-firearm")}
       />
 
