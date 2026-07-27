@@ -42,6 +42,7 @@ export default function ExploreScreen() {
         productVariantId={selectedHost.id}
         productName={selectedHost.exactModel}
         manufacturer={selectedHost.manufacturer}
+        installedComponentIds={buildItems.map((item) => item.id)}
         onPress={() => router.push("/select-firearm")}
       />
 
