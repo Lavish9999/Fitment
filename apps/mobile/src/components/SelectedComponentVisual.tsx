@@ -11,7 +11,7 @@ interface SelectedComponentVisualProps {
   manufacturer: string;
   productName: string;
   category: string;
-  priceCents?: number;
+  priceCents: number | undefined;
   onPress: () => void;
 }
 
