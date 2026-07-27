@@ -15,7 +15,8 @@
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
     "test": "pnpm test:engine",
-    "test:engine": "rm -rf .test-dist && tsc -p tsconfig.engine.json && node --test tests/*.test.mjs",
+    "clean:test-dist": "node -e \"require('node:fs').rmSync('.test-dist', { recursive: true, force: true })\"",
+    "test:engine": "pnpm clean:test-dist && tsc -p tsconfig.engine.json && node --test tests/*.test.mjs",
     "check": "pnpm test:engine && pnpm --filter @fitment/mobile typecheck"
   },
   "devDependencies": {
